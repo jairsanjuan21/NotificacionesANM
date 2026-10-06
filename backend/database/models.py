@@ -9,9 +9,9 @@ class Cliente(Base):
     id_cliente = Column(Integer, primary_key=True, index=True)
     placa = Column(String, unique=True, index=True, nullable=False)
     nombre_empresa = Column(String, nullable=True)
+    regional = Column(String, default="All")  # Opciones: bucaramanga, bogota, cartagena, cucuta, All
     activo = Column(Boolean, default=True)
 
-    # Relación para que un cliente pueda tener muchas notificaciones
     notificaciones = relationship("Notificacion", back_populates="cliente")
 
 class Notificacion(Base):
