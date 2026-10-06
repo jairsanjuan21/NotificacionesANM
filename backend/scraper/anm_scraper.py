@@ -40,16 +40,18 @@ def ejecutar_scraper():
 
         # 2. Iterar por cada cliente
         for cliente in clientes:
-            # Si el cliente tiene una regional específica asignada, usa esa; de lo contrario consulta las 4
-            regional_attr = getattr(cliente, 'regional', None)
-            regionales_a_consultar = (
-                [regional_attr.lower()] 
-                if regional_attr and regional_attr.lower() not in ['all', '', 'none'] 
-                else REGIONALES_DEFAULT
-            )
+            # Obtener regional del cliente o valor por defecto
+            reg_val = getattr(cliente, 'regional', None) or "bucaramanga"
+            
+            # Divide cadenas como "bogota,cartagena" en listas; si es "All", usa las 4
+            if reg_val.lower() == "all":
+                regionales_a_consultar = ['bucaramanga', 'bogota', 'cartagena', 'cucuta']
+            else:
+                regionales_a_consultar = [r.strip().lower() for r in reg_val.split(',') if r.strip()]
 
             for regional in regionales_a_consultar:
                 print(f"\n-> Consultando: {cliente.placa} ({cliente.nombre_empresa}) en Regional: {regional.upper()}...")
+                # ... resto de la petición a la ANM ...
                 
                 parametros = {
                     'field_punto_de_atencion_regional_value': regional,
