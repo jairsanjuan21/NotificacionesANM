@@ -40,10 +40,10 @@ def enviar_alertas_pendientes():
         <html>
           <body style="font-family: Arial, sans-serif; color: #333;">
             <div style="background-color: #2c3e50; padding: 15px; border-radius: 5px 5px 0 0;">
-                <h2 style="color: white; margin: 0;">Nuevas Resoluciones ANM Detectadas</h2>
+                <h2 style="color: white; margin: 0;">Nuevas notificaciones ANM Detectadas</h2>
             </div>
             <div style="padding: 15px; border: 1px solid #ddd; border-top: none;">
-                <p>Hola, el motor de extracción automático ha identificado novedades en los siguientes expedientes:</p>
+                <p>Ing. Samir Sanjuan, el motor de extracción automático ha identificado novedades en los siguientes expedientes:</p>
                 <table border="1" cellpadding="10" cellspacing="0" style="border-collapse: collapse; width: 100%; text-align: left;">
                   <tr style="background-color: #f2f2f2;">
                     <th>Cliente / Placa</th>

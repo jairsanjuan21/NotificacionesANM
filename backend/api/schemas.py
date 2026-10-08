@@ -1,15 +1,21 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
-# Esquemas para Cliente
 class ClienteBase(BaseModel):
     placa: str
-    nombre_empresa: Optional[str] = None
-    activo: bool = True
+    nombre_empresa: Optional[str] = "SIN NOMBRE"
+    regional: Optional[str] = "bucaramanga"
+    activo: Optional[bool] = True
 
 class ClienteCreate(ClienteBase):
     pass
+
+class ClienteUpdate(BaseModel):
+    placa: Optional[str] = None
+    nombre_empresa: Optional[str] = None
+    regional: Optional[str] = None
+    activo: Optional[bool] = None
 
 class ClienteResponse(ClienteBase):
     id_cliente: int
@@ -17,14 +23,15 @@ class ClienteResponse(ClienteBase):
     class Config:
         from_attributes = True
 
-# Esquemas para Notificación
-class NotificacionResponse(BaseModel):
-    id_notificacion: int
+class NotificacionBase(BaseModel):
     id_cliente: int
-    fecha_aviso: Optional[str] = None
+    fecha_aviso: str
     url_pdf: str
-    fecha_registro: datetime
-    notificacion_enviada: bool
+    notificacion_enviada: bool = False
+
+class NotificacionResponse(NotificacionBase):
+    id_notificacion: int
+    fecha_registro: Optional[datetime] = None
 
     class Config:
         from_attributes = True

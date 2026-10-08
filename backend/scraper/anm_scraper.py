@@ -15,43 +15,56 @@ from database.database import SessionLocal
 from database.models import Cliente, Notificacion
 from mailer.dispatcher import enviar_alertas_pendientes
 
-# Lista de sedes regionales requeridas
-REGIONALES_DEFAULT = ['bucaramanga', 'bogota', 'cartagena', 'cucuta']
+# Lista completa de las 12 sedes regionales de la ANM
+REGIONALES_ANM = [
+    'bogota', 'bucaramanga', 'cartagena', 'valledupar', 
+    'ibague', 'pasto', 'cali', 'cucuta', 
+    'manizales', 'medellin', 'nobsa', 'quibdo'
+]
 
-def ejecutar_scraper():
+def ejecutar_scraper(id_cliente_especifico: int = None) -> int:
     print("Iniciando motor de extracción ANM (Multiregional + Deep Scraping)...")
     
     db: Session = SessionLocal()
+    nuevas_notificaciones_count = 0
     
     try:
-        # 1. Obtener clientes activos
-        clientes = db.query(Cliente).filter(Cliente.activo == True).all()
+        # 1. Construir consulta de clientes activos (General o filtrada por ID)
+        query = db.query(Cliente).filter(Cliente.activo == True)
+        if id_cliente_especifico is not None:
+            query = query.filter(Cliente.id_cliente == id_cliente_especifico)
+            
+        clientes = query.all()
         
         if not clientes:
-            print("[!] No hay clientes activos registrados en la base de datos.")
-            return
+            print("[!] No se encontraron clientes activos para procesar.")
+            return 0
 
         sesion_http = requests.Session()
-        url_base = "https://www.anm.gov.co/notificaciones-por-avisos"
-        nuevas_notificaciones_count = 0
+        # Cabecera User-Agent estándar para evitar bloqueos del firewall de la ANM
+        sesion_http.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        })
         
-        # Estructura en memoria para evitar fallos por duplicados en el lote actual
+        url_base = "https://www.anm.gov.co/notificaciones-por-avisos"
+        
+        # Memoria temporal de ejecución para evitar colisiones de UNIQUE constraint en el mismo lote
         urls_procesadas_lote = set()
 
-        # 2. Iterar por cada cliente
+        # 2. Iterar por cada cliente seleccionado
         for cliente in clientes:
-            # Obtener regional del cliente o valor por defecto
             reg_val = getattr(cliente, 'regional', None) or "bucaramanga"
             
-            # Divide cadenas como "bogota,cartagena" en listas; si es "All", usa las 4
-            if reg_val.lower() == "all":
-                regionales_a_consultar = ['bucaramanga', 'bogota', 'cartagena', 'cucuta']
+            # Soporta 'all' o múltiples regionales separadas por coma (ej: 'bogota,cartagena')
+            if reg_val.strip().lower() == "all":
+                regionales_a_consultar = REGIONALES_ANM
             else:
-                regionales_a_consultar = [r.strip().lower() for r in reg_val.split(',') if r.strip()]
+                regionales_a_consultar = [
+                    r.strip().lower() for r in reg_val.split(',') if r.strip()
+                ]
 
             for regional in regionales_a_consultar:
-                print(f"\n-> Consultando: {cliente.placa} ({cliente.nombre_empresa}) en Regional: {regional.upper()}...")
-                # ... resto de la petición a la ANM ...
+                print(f"\n-> Consultando: {cliente.placa} ({cliente.nombre_empresa}) | Regional: {regional.upper()}...")
                 
                 parametros = {
                     'field_punto_de_atencion_regional_value': regional,
@@ -63,14 +76,14 @@ def ejecutar_scraper():
                 try:
                     respuesta = sesion_http.get(url_base, params=parametros, timeout=20)
                 except requests.RequestException as e:
-                    print(f"    [!] Error de red conectando con la ANM: {str(e)}")
+                    print(f"    [!] Error de red conectando con la ANM ({regional}): {str(e)}")
                     continue
 
                 if respuesta.status_code != 200:
-                    print(f"    [!] Código de respuesta HTTP: {respuesta.status_code}")
+                    print(f"    [!] Respuesta HTTP inesperada ({respuesta.status_code}) en {regional}")
                     continue
 
-                # 3. Parsing del DOM web
+                # 3. Parsing del DOM HTML devuelto por la búsqueda
                 soup = BeautifulSoup(respuesta.text, 'html.parser')
                 filas_notificaciones = soup.find_all('tr')
                 
@@ -83,12 +96,16 @@ def ejecutar_scraper():
                         fecha = td_fecha.text.strip()
                         url_boletin = enlace_boletin_html['href']
                         
+                        # Asegurar URL absoluta si el enlace viene relativo
+                        if url_boletin.startswith('/'):
+                            url_boletin = f"https://www.anm.gov.co{url_boletin}"
+                        
                         nombre_archivo_boletin = url_boletin.split('/')[-1]
                         print(f"    [*] Escaneando boletín: {nombre_archivo_boletin}")
                         
                         try:
-                            # 4. Deep Scraping: Descarga a RAM y escaneo de hipervínculos internos
-                            respuesta_pdf = requests.get(url_boletin, timeout=25)
+                            # 4. Deep Scraping: Descarga binaria a RAM y extracción de URIs del PDF
+                            respuesta_pdf = sesion_http.get(url_boletin, timeout=25)
                             
                             if respuesta_pdf.status_code == 200:
                                 doc_pdf = fitz.open(stream=respuesta_pdf.content, filetype="pdf")
@@ -97,13 +114,13 @@ def ejecutar_scraper():
                                 for pagina in doc_pdf:
                                     for enlace in pagina.get_links():
                                         uri = enlace.get("uri", "")
-                                        # Filtrar enlaces directos al expediente del cliente
-                                        if uri and cliente.placa in uri:
+                                        # Comparación insensible a mayúsculas/minúsculas para mayor precisión
+                                        if uri and cliente.placa.upper() in uri.upper():
                                             enlaces_finales_cliente.add(uri)
                                             
                                 doc_pdf.close()
                                 
-                                # 5. Persistencia y control de duplicidad
+                                # 5. Verificación de Delta e Inserción en Base de Datos
                                 for link_final in enlaces_finales_cliente:
                                     if link_final in urls_procesadas_lote:
                                         continue
@@ -123,22 +140,25 @@ def ejecutar_scraper():
                                         )
                                         db.add(nueva_not)
                                         nuevas_notificaciones_count += 1
-                                        print(f"        [+] Resolución detectada: {link_final.split('/')[-1]}")
+                                        print(f"        [+] Nuevo acto administrativo: {link_final.split('/')[-1]}")
                                         
                         except Exception as e_pdf:
-                            print(f"        [!] Error procesando PDF {url_boletin}: {str(e_pdf)}")
+                            print(f"        [!] Error al analizar el PDF {nombre_archivo_boletin}: {str(e_pdf)}")
 
-        # Confirmación de cambios en la base de datos
+        # Confirmar transacción en SQLite
         db.commit()
-        print(f"\n[OK] Extracción finalizada. {nuevas_notificaciones_count} novedades agregadas.")
+        print(f"\n[OK] Proceso finalizado. {nuevas_notificaciones_count} notificaciones nuevas guardadas en BD.")
 
-        # 6. Despacho automático de correo solo si hay novedades reales
+        # 6. Disparo automático de alertas por correo si hubo novedades
         if nuevas_notificaciones_count > 0:
             enviar_alertas_pendientes()
 
+        return nuevas_notificaciones_count
+
     except Exception as e:
-        print(f"\n[CRITICAL] Error en el ciclo de ejecución: {str(e)}")
+        print(f"\n[CRITICAL] Error en el motor de extracción: {str(e)}")
         db.rollback()
+        raise e
     finally:
         db.close()
 
