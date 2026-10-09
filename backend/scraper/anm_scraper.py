@@ -55,13 +55,14 @@ def ejecutar_scraper(id_cliente_especifico: int = None) -> int:
         for cliente in clientes:
             reg_val = getattr(cliente, 'regional', None) or "bucaramanga"
             
-            # Soporta 'all' o múltiples regionales separadas por coma (ej: 'bogota,cartagena')
-            if reg_val.strip().lower() == "all":
-                regionales_a_consultar = REGIONALES_ANM
+            # Normalizar lista de sedes
+            partes = [r.strip().lower() for r in reg_val.split(',') if r.strip()]
+            
+            # Si contiene 'all', se consulta directamente a nivel nacional (una sola vez)
+            if 'all' in partes:
+                regionales_a_consultar = ['All']
             else:
-                regionales_a_consultar = [
-                    r.strip().lower() for r in reg_val.split(',') if r.strip()
-                ]
+                regionales_a_consultar = partes
 
             for regional in regionales_a_consultar:
                 print(f"\n-> Consultando: {cliente.placa} ({cliente.nombre_empresa}) | Regional: {regional.upper()}...")
