@@ -1,3 +1,6 @@
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 import pytz
@@ -103,3 +106,14 @@ def obtener_estado_scheduler():
         "zona_horaria": "America/Bogota",
         "tareas_programadas": jobs_info
     }
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
+
+if os.path.exists(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def servir_spa_react(full_path: str):
+        archivo_solicitado = os.path.join(FRONTEND_DIST, full_path)
+        if full_path and os.path.isfile(archivo_solicitado):
+            return FileResponse(archivo_solicitado)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))

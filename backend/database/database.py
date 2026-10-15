@@ -1,19 +1,18 @@
+import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-# URL para SQLite local (creará un archivo anm_notificaciones.db en la raíz del backend)
-SQLALCHEMY_DATABASE_URL = "sqlite:///./anm_notificaciones.db"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "notificaciones_anm.db") # <-- Usa aquí el nombre exacto de tu archivo .db actual
 
-# engine es el motor de conexión
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
+
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
-# Dependencia para inyectar la sesión de base de datos en nuestras rutas
 def get_db():
     db = SessionLocal()
     try:
