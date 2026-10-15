@@ -87,3 +87,13 @@ def disparar_scraper(id_cliente: Optional[int] = None):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fallo en el scraper: {str(e)}")
+# --- 7. ELIMINAR UNA NOTIFICACIÓN ESPECÍFICA ---
+@router.delete("/notificaciones/{id_notificacion}")
+def eliminar_notificacion(id_notificacion: int, db: Session = Depends(database.get_db)):
+    notif = db.query(models.Notificacion).filter(models.Notificacion.id_notificacion == id_notificacion).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notificación no encontrada.")
+    
+    db.delete(notif)
+    db.commit()
+    return {"mensaje": "Notificación eliminada correctamente."}    

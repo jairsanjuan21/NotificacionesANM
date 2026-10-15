@@ -1,26 +1,105 @@
+from contextlib import asynccontextmanager
+from datetime import datetime
+import pytz
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import models
-from database.database import engine
-from api.routes import router
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
-# Inicializar tablas
-models.Base.metadata.create_all(bind=engine)
+from database import models, database
+from api import routes
+from scraper.anm_scraper import ejecutar_scraper
 
-app = FastAPI(title="API Notificaciones ANM", version="1.0.0")
+# Crear tablas en la base de datos si no existen
+models.Base.metadata.create_all(bind=database.engine)
 
-# Configuración estricta de CORS para el Frontend
+# Definir zona horaria de Colombia
+ZONA_HORARIA_CO = pytz.timezone("America/Bogota")
+
+# Instanciar el programador en segundo plano
+scheduler = BackgroundScheduler(timezone=ZONA_HORARIA_CO)
+
+
+def tarea_programada_scraper():
+    ahora = datetime.now(ZONA_HORARIA_CO).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"\n[CRON {ahora}] Iniciando barrido automático programado en la ANM...")
+    try:
+        nuevas = ejecutar_scraper()
+        print(f"[CRON] Ejecución automática finalizada. Nuevas notificaciones: {nuevas}")
+    except Exception as e:
+        print(f"[CRON ERROR] Fallo durante la ejecución programada: {str(e)}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- AL INICIAR EL SERVIDOR ---
+    # 1. Regla Lunes a Viernes: 8:30 AM y 5:30 PM (17:30)
+    scheduler.add_job(
+        tarea_programada_scraper,
+        CronTrigger(day_of_week="mon-fri", hour="8,17", minute=30, timezone=ZONA_HORARIA_CO),
+        id="barrido_lun_vie",
+        name="Barrido ANM Lunes a Viernes (8:30 AM y 5:30 PM)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True
+    )
+
+    # 2. Regla Domingos: 6:00 PM (18:00)
+    scheduler.add_job(
+        tarea_programada_scraper,
+        CronTrigger(day_of_week="sun", hour=18, minute=0, timezone=ZONA_HORARIA_CO),
+        id="barrido_domingo",
+        name="Barrido ANM Domingos (6:00 PM)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True
+    )
+
+    scheduler.start()
+    print("\n=======================================================")
+    print(" [SCHEDULER ACTIVO] Zona Horaria: America/Bogota")
+    for job in scheduler.get_jobs():
+        print(f" -> {job.name} | Próxima ejecución: {job.next_run_time}")
+    print("=======================================================\n")
+
+    yield
+
+    # --- AL APAGAR EL SERVIDOR ---
+    scheduler.shutdown()
+    print("[SCHEDULER] Programador de tareas detenido.")
+
+
+app = FastAPI(
+    title="API de Monitoreo Minero ANM",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+# Configuración CORS (Preparada para desarrollo local y producción)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción limitaremos esto a la URL de tu frontend
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Incluir las rutas que acabamos de crear bajo el prefijo /api
-app.include_router(router, prefix="/api")
+# Registrar las rutas de la API
+app.include_router(routes.router, prefix="/api")
 
-@app.get("/")
-def read_root():
-    return {"estado": "En línea", "mensaje": "API de scraping y base de datos inicializadas"}
+
+# Endpoint de diagnóstico para verificar cuándo será el próximo barrido automático
+@app.get("/api/scheduler/estado")
+def obtener_estado_scheduler():
+    jobs_info = []
+    for job in scheduler.get_jobs():
+        jobs_info.append({
+            "id": job.id,
+            "descripcion": job.name,
+            "proxima_ejecucion": job.next_run_time.strftime("%Y-%m-%d %H:%M:%S %Z") if job.next_run_time else None
+        })
+    return {
+        "activo": scheduler.running,
+        "zona_horaria": "America/Bogota",
+        "tareas_programadas": jobs_info
+    }
