@@ -1,10 +1,12 @@
 import os
+import base64
+import secrets
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 import pytz
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -78,14 +80,38 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configuración CORS (Preparada para desarrollo local y producción)
+# Configuración CORS: el frontend en producción se sirve desde el mismo dominio,
+# así que solo se permite el servidor de desarrollo de Vite.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Autenticación básica: se activa definiendo ADMIN_USER y ADMIN_PASSWORD.
+# El navegador muestra su ventana de usuario/contraseña y reutiliza las credenciales.
+ADMIN_USER = os.getenv("ADMIN_USER")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+
+
+@app.middleware("http")
+async def autenticacion_basica(request: Request, call_next):
+    if not (ADMIN_USER and ADMIN_PASSWORD) or request.method == "OPTIONS":
+        return await call_next(request)
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Basic "):
+        try:
+            usuario, _, clave = base64.b64decode(auth[6:]).decode("utf-8").partition(":")
+            if secrets.compare_digest(usuario, ADMIN_USER) and secrets.compare_digest(clave, ADMIN_PASSWORD):
+                return await call_next(request)
+        except Exception:
+            pass
+    return Response(
+        "Acceso restringido", status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="Monitoreo ANM", charset="UTF-8"'}
+    )
 
 # Registrar las rutas de la API
 app.include_router(routes.router, prefix="/api")

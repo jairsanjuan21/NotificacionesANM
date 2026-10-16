@@ -97,3 +97,27 @@ def eliminar_notificacion(id_notificacion: int, db: Session = Depends(database.g
     db.delete(notif)
     db.commit()
     return {"mensaje": "Notificación eliminada correctamente."}    
+
+# --- 8. REINTENTAR ENVÍO DE NOTIFICACIONES PENDIENTES ---
+@router.post("/notificaciones/enviar-pendientes")
+def reenviar_pendientes(db: Session = Depends(database.get_db)):
+    from mailer.dispatcher import enviar_alertas_pendientes
+    resultado = enviar_alertas_pendientes(db)
+    if resultado.get("error"):
+        raise HTTPException(status_code=500, detail=resultado["error"])
+    return resultado
+
+
+# --- 9. DIAGNÓSTICO DE CORREO (no muestra valores secretos) ---
+@router.get("/correo/diagnostico")
+def diagnostico_correo(db: Session = Depends(database.get_db)):
+    import os
+    pendientes = db.query(models.Notificacion).filter(models.Notificacion.notificacion_enviada == False).count()
+    return {
+        "modo_envio": "brevo_api" if os.getenv("BREVO_API_KEY") else ("gmail_smtp" if os.getenv("EMAIL_PASSWORD") else "sin_configurar"),
+        "BREVO_API_KEY": bool(os.getenv("BREVO_API_KEY")),
+        "EMAIL_SENDER": bool(os.getenv("EMAIL_SENDER")),
+        "EMAIL_RECEIVER": bool(os.getenv("EMAIL_RECEIVER")),
+        "EMAIL_PASSWORD": bool(os.getenv("EMAIL_PASSWORD")),
+        "notificaciones_pendientes": pendientes,
+    }

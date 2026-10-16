@@ -94,8 +94,8 @@ def enviar_alertas_pendientes(db: Session):
     for notif in pendientes:
         cliente = notif.cliente
         placa = getattr(cliente, "placa", "N/A")
-        titular = getattr(cliente, "nombre_cliente", getattr(cliente, "titular", "Titular Registrado"))
-        par = getattr(cliente, "par", getattr(cliente, "regional", "ANM"))
+        titular = getattr(cliente, "nombre_empresa", None) or "Titular Registrado"
+        par = (getattr(cliente, "regional", None) or "ANM").upper()
         nombre_archivo = notif.url_pdf.split("/")[-1] if notif.url_pdf else "Documento PDF"
 
         filas_html += f"""
