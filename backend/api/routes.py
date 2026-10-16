@@ -353,6 +353,7 @@ def diagnostico_correo(db: Session = Depends(database.get_db)):
         "EMAIL_RECEIVER": bool(os.getenv("EMAIL_RECEIVER")),
         "EMAIL_PASSWORD": bool(os.getenv("EMAIL_PASSWORD")),
         "telegram": telegram_configurado(),
+        "usuario_panel": bool(os.getenv("PANEL_USER") and os.getenv("PANEL_PASSWORD")),
         "resumen_ia_gemini": bool(os.getenv("GEMINI_API_KEY")),
         "base_de_datos": "postgres" if os.getenv("DATABASE_URL") else ("volume" if os.getenv("DB_PATH") else "repositorio (se reinicia en cada deploy)"),
         "notificaciones_pendientes": pendientes,

@@ -1,8 +1,14 @@
 import os
-import base64
-import secrets
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# La captura de logs se instala antes que todo lo demás, para no perder nada del arranque
+from servicios import registro
+registro.instalar()
+
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 import pytz
@@ -13,7 +19,8 @@ from apscheduler.triggers.cron import CronTrigger
 
 from database import models, database
 from database.migraciones import migrar
-from api import routes
+from api import routes, auth_routes, admin_routes
+from servicios import auth
 from scraper.anm_scraper import ejecutar_scraper
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
 
@@ -138,30 +145,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Autenticación básica: se activa definiendo ADMIN_USER y ADMIN_PASSWORD.
-# El navegador muestra su ventana de usuario/contraseña y reutiliza las credenciales.
-ADMIN_USER = os.getenv("ADMIN_USER")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+# Sesiones: se activan definiendo ADMIN_USER/ADMIN_PASSWORD (administrador) y
+# PANEL_USER/PANEL_PASSWORD (usuario del panel). Sin usuarios configurados, el acceso es libre.
+if not auth.autenticacion_activa():
+    print("[AUTH AVISO] No hay usuarios configurados: el panel está abierto sin contraseña.")
 
 
 @app.middleware("http")
-async def autenticacion_basica(request: Request, call_next):
-    if not (ADMIN_USER and ADMIN_PASSWORD) or request.method == "OPTIONS":
+async def control_de_acceso(request: Request, call_next):
+    ruta = request.url.path
+    protegida = ruta.startswith("/api/") or auth.requiere_admin(ruta)
+    if request.method == "OPTIONS" or not protegida or not auth.autenticacion_activa() \
+            or ruta in auth.RUTAS_PUBLICAS:
         return await call_next(request)
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Basic "):
-        try:
-            usuario, _, clave = base64.b64decode(auth[6:]).decode("utf-8").partition(":")
-            if secrets.compare_digest(usuario, ADMIN_USER) and secrets.compare_digest(clave, ADMIN_PASSWORD):
-                return await call_next(request)
-        except Exception:
-            pass
-    return Response(
-        "Acceso restringido", status_code=401,
-        headers={"WWW-Authenticate": 'Basic realm="Monitoreo ANM", charset="UTF-8"'}
-    )
+    sesion = auth.leer_token(request.cookies.get(auth.NOMBRE_COOKIE, ""))
+    if not sesion:
+        return JSONResponse({"detail": "Su sesión expiró. Inicie sesión de nuevo."}, status_code=401)
+    if auth.requiere_admin(ruta) and sesion["rol"] != "admin":
+        return JSONResponse({"detail": "Esta sección es solo para el administrador."}, status_code=403)
+    request.state.sesion = sesion
+    return await call_next(request)
 
 # Registrar las rutas de la API
+app.include_router(auth_routes.router, prefix="/api")
+app.include_router(admin_routes.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 
 @app.get("/api/scheduler/estado")

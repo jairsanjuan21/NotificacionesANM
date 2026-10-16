@@ -19,6 +19,15 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 - **Gestión**: estado (nueva / revisada / en trámite / respondida) y notas por notificación; importación de placas
   desde Excel o CSV; copia opcional al correo del titular.
 
+## Panel
+
+- **Bandeja**: todas las notificaciones ordenadas por prioridad (urgentes y por vencer primero), con filtros, búsqueda
+  y un panel de detalle con el resumen, el plazo, la gestión, las notas y el PDF incrustado.
+- **Vencimientos**: agenda de fechas límite agrupada por semana.
+- **Títulos mineros**: lista de placas con sus pendientes, historial, edición e importación desde Excel.
+- **Monitoreo del sistema** (solo administrador): estado general, métricas y gráficos de barridos, historial de
+  barridos, logs de la aplicación en vivo, logs de Railway (servidor y build) y verificación de la configuración.
+
 ## Tareas programadas (hora de Colombia)
 
 | Tarea | Cuándo |
@@ -37,7 +46,8 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 | `EMAIL_SENDER` | Remitente **verificado** en Brevo. |
 | `EMAIL_RECEIVER` | Destinatario(s) de las alertas, separados por coma. |
 | `DB_PATH` | `/data/anm_notificaciones.db` con un **Volume** montado en `/data`. Sin esto la base se reinicia en cada deploy. |
-| `ADMIN_USER` / `ADMIN_PASSWORD` | Usuario y contraseña para entrar al panel. |
+| `ADMIN_USER` / `ADMIN_PASSWORD` | Usuario **administrador**: ve todo, incluido el monitoreo y los logs. |
+| `PANEL_USER` / `PANEL_PASSWORD` | Usuario del **panel** para el día a día: bandeja, vencimientos y títulos, sin monitoreo. |
 
 ### Opcionales
 
@@ -59,6 +69,9 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 | `DIAS_SIN_BARRIDO_OK` | `3` | Días sin barrido exitoso antes de alertar. |
 | `ARCHIVO_DIR` | junto a `DB_PATH` | Carpeta donde se guardan las copias de los PDF. |
 | `DATABASE_URL` | — | Alternativa: usar Postgres en lugar de SQLite. |
+| `RAILWAY_API_TOKEN` | — | Token de proyecto de Railway (Project Settings → Tokens) para ver los logs de Railway en el monitoreo. |
+| `SESSION_SECRET` | derivado de las contraseñas | Clave para firmar las sesiones. Si cambia una contraseña, se cierran todas las sesiones. |
+| `LOG_DIR` | junto a `DB_PATH` | Carpeta donde se guardan los logs de la aplicación. |
 
 > **Las fechas límite son estimadas.** Siguen por defecto las reglas del CPACA (art. 69 y 76) y deben validarse
 > contra cada acto administrativo. Se pueden ajustar con las variables de arriba.
