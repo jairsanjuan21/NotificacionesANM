@@ -46,6 +46,7 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | — | Alertas por Telegram (chat ids separados por coma). |
 | `GEMINI_API_KEY` | — | Resumen con IA (capa gratuita de Google AI Studio). |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Modelo de Gemini. |
+| `GEMINI_MODELOS_RESPALDO` | `gemini-3.1-flash-lite,gemini-3.6-flash` | Modelos que se prueban si el principal está saturado o sin cupo. |
 | `GEMINI_MAX_POR_BARRIDO` | `25` | Máximo de resúmenes por barrido (cuida el cupo gratuito). |
 | `ALERTAS_EMAIL` | `EMAIL_RECEIVER` | Correo para alertas de fallas del sistema. |
 | `URL_PANEL` | URL de Railway | Enlace al panel que aparece en los correos. |

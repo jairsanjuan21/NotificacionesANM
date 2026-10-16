@@ -115,7 +115,7 @@ function BotonResumir({ notif, onCambio }) {
       title={notif.resumen ? 'Volver a generar el resumen' : 'Generar un resumen corto con Gemini'}
       style={{ marginTop: '4px', background: cargando ? '#ecf0f1' : '#f4ecf7', color: '#7d3c98', border: '1px solid #d2b4de', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: cargando ? 'wait' : 'pointer', fontWeight: 'bold' }}
     >
-      {cargando ? '⏳ Leyendo el acto…' : notif.resumen ? '↻ Regenerar resumen' : '✨ Resumir con IA'}
+      {cargando ? '⏳ Leyendo el acto (puede tardar hasta 1 min)…' : notif.resumen ? '↻ Regenerar resumen' : '✨ Resumir con IA'}
     </button>
   );
 }

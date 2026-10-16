@@ -67,5 +67,10 @@ def procesar_notificacion(notif, sesion_http=None, cache_pdfs=None, usar_ia=True
             notif.resumen = resumen
             if contador_ia is not None:
                 contador_ia[0] += 1
+        elif contador_ia is not None and len(texto.strip()) >= 80:
+            # Gemini falló (saturado o sin cupo): no seguir intentando en este barrido para no
+            # demorarlo; estas notificaciones se pueden resumir después con el botón del panel.
+            print("    [IA] Se omiten los resúmenes restantes de este barrido.")
+            contador_ia[0] = MAX_IA_POR_BARRIDO
 
     notif.procesada = True

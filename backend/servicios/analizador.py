@@ -5,6 +5,7 @@ urgencia por palabras clave y resumen opcional con IA gratuita (Gemini).
 import os
 import re
 import time
+from collections import Counter
 import unicodedata
 
 import pymupdf as fitz
@@ -125,10 +126,40 @@ def clasificar_urgencia(texto_norm: str, fuente: str = "avisos", tipo_notificaci
 _ultimo_llamado_ia = [0.0]
 
 
+MODELO_PRINCIPAL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+# Si el principal está saturado o sin cupo, se prueban estos (también tienen capa gratuita)
+MODELOS_RESPALDO = [m.strip() for m in os.getenv("GEMINI_MODELOS_RESPALDO", "gemini-3.1-flash-lite,gemini-3.6-flash").split(",") if m.strip()]
+ESPERAS_REINTENTO = [3, 8]  # segundos entre reintentos cuando el modelo está saturado (503/500)
+
+
+def _llamar_gemini(modelo: str, clave: str, prompt: str):
+    """Una llamada a un modelo. Devuelve (resumen, codigo_http, detalle)."""
+    espera = 4.5 - (time.time() - _ultimo_llamado_ia[0])  # respetar el límite por minuto
+    if espera > 0:
+        time.sleep(espera)
+    _ultimo_llamado_ia[0] = time.time()
+    r = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
+        headers={"x-goog-api-key": clave, "content-type": "application/json"},
+        json={"contents": [{"parts": [{"text": prompt}]}],
+              "generationConfig": {"temperature": 0.2, "maxOutputTokens": 200}},
+        timeout=30,
+    )
+    if r.status_code != 200:
+        return None, r.status_code, r.text[:300]
+    candidatos = r.json().get("candidates") or []
+    if not candidatos:
+        return None, 200, "Gemini no devolvió respuesta (posible bloqueo de contenido)."
+    partes = candidatos[0].get("content", {}).get("parts", [])
+    texto = " ".join(p.get("text", "") for p in partes).strip()
+    return (texto or None), 200, ("" if texto else "Respuesta vacía.")
+
+
 def generar_resumen_ia(texto: str):
     """
-    Llama a la capa gratuita de Google Gemini. Devuelve (resumen, error):
-    resumen es None si no se pudo generar y error explica el motivo.
+    Llama a la capa gratuita de Google Gemini. Devuelve (resumen, error).
+    Si el modelo está saturado (503/500) reintenta; si sigue saturado, sin cupo (429)
+    o no existe (404), prueba los modelos de respaldo.
     Nota: en la capa gratuita Google puede usar los textos para mejorar sus
     productos; los actos de la ANM ya son públicos.
     """
@@ -137,43 +168,40 @@ def generar_resumen_ia(texto: str):
         return None, "No está configurada la variable GEMINI_API_KEY."
     if len((texto or "").strip()) < 80:
         return None, "El PDF no tiene texto legible (posiblemente es un documento escaneado)."
-    modelo = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
-
-    # Respetar el límite de solicitudes por minuto de la capa gratuita
-    espera = 4.5 - (time.time() - _ultimo_llamado_ia[0])
-    if espera > 0:
-        time.sleep(espera)
-    _ultimo_llamado_ia[0] = time.time()
 
     prompt = (
         "Eres asistente de un ingeniero de minas en Colombia. Resume en máximo 2 frases, en español, "
         "este acto administrativo de la Agencia Nacional de Minería: qué decide o qué le exigen al titular, "
         "y el plazo si lo menciona. Sin introducciones.\n\n" + texto[:12000]
     )
-    try:
-        r = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent",
-            headers={"x-goog-api-key": clave, "content-type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0.2, "maxOutputTokens": 200}},
-            timeout=30,
-        )
-        if r.status_code != 200:
-            print(f"    [IA] Gemini respondió {r.status_code}: {r.text[:300]}")
-            motivo = {400: "solicitud inválida o clave incorrecta", 403: "la clave no tiene permiso",
-                      404: f"el modelo '{modelo}' no existe (revise GEMINI_MODEL)",
-                      429: "se agotó el cupo gratuito por ahora; intente más tarde"}.get(r.status_code, "error del servicio")
-            return None, f"Gemini respondió {r.status_code}: {motivo}. Detalle: {r.text[:300]}"
-        datos = r.json()
-        candidatos = datos.get("candidates") or []
-        if not candidatos:
-            return None, f"Gemini no devolvió respuesta (posible bloqueo de contenido): {str(datos)[:300]}"
-        partes = candidatos[0].get("content", {}).get("parts", [])
-        resumen = " ".join(p.get("text", "") for p in partes).strip()
-        return (resumen, None) if resumen else (None, "Gemini devolvió una respuesta vacía.")
-    except Exception as e:
-        print(f"    [IA] No se pudo generar resumen: {e}")
-        return None, f"No se pudo conectar con Gemini: {e}"
+    intentos = []
+    for modelo in dict.fromkeys([MODELO_PRINCIPAL] + MODELOS_RESPALDO):
+        for n_intento in range(len(ESPERAS_REINTENTO) + 1):
+            try:
+                resumen, codigo, detalle = _llamar_gemini(modelo, clave, prompt)
+            except Exception as e:
+                resumen, codigo, detalle = None, 0, str(e)
+            if resumen:
+                if intentos:
+                    print(f"    [IA] Resumen generado con {modelo} tras: {'; '.join(intentos)}")
+                return resumen, None
+            intentos.append(f"{modelo} → {codigo or 'sin conexión'}")
+            print(f"    [IA] {modelo} respondió {codigo}: {detalle[:200]}")
+            if codigo in (400, 401, 403):  # clave inválida o sin permiso: no sirve reintentar
+                return None, f"Gemini rechazó la clave (HTTP {codigo}). Revise GEMINI_API_KEY. Detalle: {detalle}"
+            if codigo in (500, 503, 0) and n_intento < len(ESPERAS_REINTENTO):
+                time.sleep(ESPERAS_REINTENTO[n_intento])  # saturado: esperar y reintentar el mismo modelo
+                continue
+            break  # 404, 429, 200 vacío o saturación persistente: pasar al siguiente modelo
+
+    codigos = ", ".join(f"{k} (x{v})" if v > 1 else k for k, v in dict(Counter(intentos)).items())
+    if all(" 503" in x or " 500" in x for x in intentos):
+        motivo = "Los modelos gratuitos de Gemini están saturados en este momento. Intente de nuevo en unos minutos."
+    elif any(" 429" in x for x in intentos):
+        motivo = "Se agotó el cupo gratuito de Gemini por ahora. Intente más tarde."
+    else:
+        motivo = "Gemini no pudo generar el resumen."
+    return None, f"{motivo} (Intentos: {codigos})"
 
 
 def resumir_con_ia(texto: str):
