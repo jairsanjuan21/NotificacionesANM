@@ -13,7 +13,7 @@ from database.database import SessionLocal
 from database.models import Cliente, Notificacion, Ejecucion
 from mailer.dispatcher import enviar_alertas_pendientes, enviar_alerta_sistema
 from servicios.analizador import normalizar
-from servicios.plazos import normalizar_fecha_iso
+from servicios.plazos import normalizar_fecha_iso, parsear_fecha
 from servicios.procesamiento import procesar_notificacion
 
 REGIONALES_ANM = [
@@ -24,6 +24,9 @@ REGIONALES_ANM = [
 
 URL_BASE = "https://www.anm.gov.co/notificaciones-por-avisos"
 URL_COACTIVO = "https://www.anm.gov.co/avisos-cobro-coactivo"
+# Notificaciones publicadas antes de esta fecha se guardan, pero NO se envían por correo
+# (evita alertas de actos antiguos ya resueltos, por ejemplo al agregar una placa nueva).
+FECHA_MINIMA_ALERTAS = os.getenv("FECHA_MINIMA_ALERTAS", "2025-06-01")
 FUENTE_COACTIVO_ACTIVA = os.getenv("FUENTE_COACTIVO", "true").lower() in ("1", "true", "si", "sí")
 
 # Evita dos barridos al mismo tiempo (cron + botón manual), que duplicarían registros
@@ -161,8 +164,11 @@ class Contexto:
         self.claves_lote.add(clave)
         if existe:
             return
-        n = Notificacion(id_cliente=cliente.id_cliente, fecha_aviso=normalizar_fecha_iso(fecha), url_pdf=url,
-                         notificacion_enviada=False, fuente=fuente, tipo_notificacion=tipo or None,
+        fecha_iso = normalizar_fecha_iso(fecha)
+        minima = parsear_fecha(FECHA_MINIMA_ALERTAS)
+        es_antigua = bool(minima and parsear_fecha(fecha_iso) and parsear_fecha(fecha_iso) < minima)
+        n = Notificacion(id_cliente=cliente.id_cliente, fecha_aviso=fecha_iso, url_pdf=url,
+                         notificacion_enviada=es_antigua, fuente=fuente, tipo_notificacion=tipo or None,
                          numero=numero or None, estado="nueva")
         n.cliente = cliente
         self.db.add(n)

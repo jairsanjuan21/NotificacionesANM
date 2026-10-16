@@ -50,6 +50,7 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 | `GEMINI_MAX_POR_BARRIDO` | `25` | Máximo de resúmenes por barrido (cuida el cupo gratuito). |
 | `ALERTAS_EMAIL` | `EMAIL_RECEIVER` | Correo para alertas de fallas del sistema. |
 | `URL_PANEL` | URL de Railway | Enlace al panel que aparece en los correos. |
+| `FECHA_MINIMA_ALERTAS` | `2025-06-01` | Las notificaciones publicadas antes de esta fecha se guardan pero no se envían por correo. |
 | `FUENTE_COACTIVO` | `true` | Consultar avisos de cobro coactivo. |
 | `DIAS_FIJACION_AVISO` | `5` | Días hábiles que el aviso permanece publicado. |
 | `DIAS_RECURSO` | `10` | Días hábiles para el recurso de reposición. |

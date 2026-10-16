@@ -4,6 +4,17 @@ import { API_BASE, BadgeUrgencia, CeldaPlazo, SelectorEstado, CeldaDocumento } f
 import Vencimientos from './Vencimientos';
 import Monitoreo from './Monitoreo';
 
+const FECHA_DESDE_POR_DEFECTO = '2025-06-01';
+
+const leerFechaDesde = () => {
+  try {
+    const v = localStorage.getItem('fechaDesde');
+    return v === null ? FECHA_DESDE_POR_DEFECTO : v;
+  } catch {
+    return FECHA_DESDE_POR_DEFECTO;
+  }
+};
+
 const botonPestana = (activa) => ({
   padding: '10px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold',
   background: activa ? '#1f3a52' : '#ecf0f1', color: activa ? 'white' : '#2c3e50'
@@ -56,6 +67,12 @@ function App() {
   const [filtroEstado, setFiltroEstado] = useState('todos'); // 'todos' | 'con_boletines' | 'sin_boletines'
   const [criterioOrden, setCriterioOrden] = useState('fecha_desc'); // 'fecha_desc' | 'fecha_asc' | 'placa_asc'
   const [filtroGestion, setFiltroGestion] = useState('todas'); // 'todas' | 'sin_responder' | 'urgentes'
+  const [fechaDesde, setFechaDesdeEstado] = useState(leerFechaDesde); // '' = sin límite
+
+  const setFechaDesde = (valor) => {
+    setFechaDesdeEstado(valor);
+    try { localStorage.setItem('fechaDesde', valor); } catch { /* sin almacenamiento: solo en memoria */ }
+  };
 
   // Estados para formulario CRUD de Placa
   const [editandoId, setEditandoId] = useState(null);
@@ -219,9 +236,29 @@ function App() {
     }
   };
 
+  // Notificaciones dentro del periodo elegido (filtro "Desde")
+  const tsDesde = fechaDesde ? parsearFechaANM(fechaDesde) : 0;
+  const notificacionesVisibles = tsDesde
+    ? notificaciones.filter(n => parsearFechaANM(n.fecha_aviso) >= tsDesde)
+    : notificaciones;
+  const antiguasSinResolver = tsDesde
+    ? notificaciones.filter(n => parsearFechaANM(n.fecha_aviso) < tsDesde && n.estado !== 'respondida').length
+    : 0;
+
+  const marcarAntiguasRespondidas = async () => {
+    if (!window.confirm(`¿Marcar como RESPONDIDAS las ${antiguasSinResolver} notificaciones publicadas antes del ${fechaDesde}?\n\nSe quitarán de los vencimientos y recordatorios. Puede cambiar el estado de cualquiera después.`)) return;
+    try {
+      const res = await axios.post(`${API_BASE}/notificaciones/marcar-respondidas?antes_de=${fechaDesde}`);
+      alert(`${res.data.marcadas} notificaciones marcadas como respondidas.`);
+      cargarDatos();
+    } catch (error) {
+      alert('No se pudo completar: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
   // Procesar clientes y ordenar sus notificaciones internamente
   const clientesProcesados = clientes.map(cliente => {
-    const notifsOrdenadas = notificaciones
+    const notifsOrdenadas = notificacionesVisibles
       .filter(n => n.id_cliente === cliente.id_cliente)
       .filter(n =>
         filtroGestion === 'todas' ||
@@ -288,9 +325,9 @@ function App() {
   const fechaMasRecienteGlobal = clientesProcesados.reduce((max, c) => 
     c.ultimaFechaTimestamp > max.ts ? { ts: c.ultimaFechaTimestamp, txt: c.ultimaFechaTexto } : max
   , { ts: 0, txt: 'N/A' }).txt;
-  const porVencer = notificaciones.filter(n =>
+  const porVencer = notificacionesVisibles.filter(n =>
     n.estado !== 'respondida' && n.dias_habiles_restantes !== null && n.dias_habiles_restantes >= 0 && n.dias_habiles_restantes <= 5).length;
-  const urgentesSinGestion = notificaciones.filter(n => n.urgencia === 'alta' && n.estado === 'nueva').length;
+  const urgentesSinGestion = notificacionesVisibles.filter(n => n.urgencia === 'alta' && n.estado === 'nueva').length;
 
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '1200px', margin: '0 auto', padding: '20px', color: '#2c3e50' }}>
@@ -320,7 +357,10 @@ function App() {
         </div>
         <div style={{ background: '#ffffff', border: '1px solid #e1e8ed', borderLeft: '4px solid #27ae60', padding: '14px 18px', borderRadius: '8px' }}>
           <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold', textTransform: 'uppercase' }}>Resoluciones Extraídas</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px' }}>{notificaciones.length}</div>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px' }}>
+            {notificacionesVisibles.length}
+            {fechaDesde && <span style={{ fontSize: '13px', color: '#7f8c8d', fontWeight: 'normal' }}> desde {fechaDesde}</span>}
+          </div>
         </div>
         <div style={{ background: '#ffffff', border: '1px solid #e1e8ed', borderLeft: '4px solid #8e44ad', padding: '14px 18px', borderRadius: '8px' }}>
           <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold', textTransform: 'uppercase' }}>Último Aviso Registrado</div>
@@ -378,6 +418,22 @@ function App() {
           <option value="placa_asc">🔤 Orden Alfabético (Placa A-Z)</option>
         </select>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: fechaDesde ? '#ebf5fb' : 'white', border: `1px solid ${fechaDesde ? '#2980b9' : '#ccc'}`, borderRadius: '6px', padding: '4px 8px' }}>
+          <label htmlFor="fechaDesde" style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f3a52', whiteSpace: 'nowrap' }}>📆 Desde</label>
+          <input
+            id="fechaDesde"
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            style={{ padding: '5px', border: 'none', background: 'transparent', fontSize: '13px' }}
+          />
+          {fechaDesde ? (
+            <button onClick={() => setFechaDesde('')} title="Ver todas las fechas" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#7f8c8d', fontSize: '12px' }}>✕ todo</button>
+          ) : (
+            <button onClick={() => setFechaDesde(FECHA_DESDE_POR_DEFECTO)} title="Volver a junio de 2025" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#2980b9', fontSize: '12px' }}>jun 2025</button>
+          )}
+        </div>
+
         {pestanaActiva === 'boletines' && (
           <select
             value={filtroGestion}
@@ -403,6 +459,21 @@ function App() {
           </button>
         )}
       </div>
+      )}
+
+      {pestanaActiva === 'boletines' && antiguasSinResolver > 0 && (
+        <div style={{ padding: '10px 16px', background: '#f8f9fa', border: '1px solid #e1e8ed', borderRadius: '6px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '13px', color: '#566573' }}>
+          <span>
+            Ocultas: <strong>{notificaciones.length - notificacionesVisibles.length}</strong> notificaciones anteriores al {fechaDesde}{' '}
+            ({antiguasSinResolver} sin marcar como respondidas).
+          </span>
+          <button
+            onClick={marcarAntiguasRespondidas}
+            style={{ padding: '6px 12px', background: '#7f8c8d', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+          >
+            ✅ Marcar esas {antiguasSinResolver} como respondidas
+          </button>
+        </div>
       )}
 
       {mensajeSync && (
@@ -661,7 +732,7 @@ function App() {
                     {notifsCliente.length === 0 && (
                       <tr>
                         <td colSpan="7" style={{ padding: '14px', textAlign: 'center', color: '#7f8c8d' }}>
-                          Sin resoluciones registradas para esta placa.
+                          {fechaDesde ? `Sin resoluciones desde el ${fechaDesde}.` : 'Sin resoluciones registradas para esta placa.'}
                         </td>
                       </tr>
                     )}
@@ -673,7 +744,7 @@ function App() {
           })}
         </div>
       )}
-      {pestanaActiva === 'vencimientos' && <Vencimientos clientes={clientes} onCambio={cargarDatos} />}
+      {pestanaActiva === 'vencimientos' && <Vencimientos clientes={clientes} onCambio={cargarDatos} fechaDesde={fechaDesde} />}
       {pestanaActiva === 'monitoreo' && <Monitoreo onCambio={cargarDatos} />}
     </div>
   );

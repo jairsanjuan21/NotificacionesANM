@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_BASE, BadgeUrgencia, CeldaPlazo, SelectorEstado, CeldaDocumento } from './componentes';
 
-export default function Vencimientos({ clientes, onCambio }) {
+export default function Vencimientos({ clientes, onCambio, fechaDesde }) {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
 
@@ -20,9 +20,10 @@ export default function Vencimientos({ clientes, onCambio }) {
 
   useEffect(() => { cargar(); }, []);
 
+  const enPeriodo = (n) => !fechaDesde || (n.fecha_aviso || '') >= fechaDesde;
   const cliente = (id) => clientes.find(c => c.id_cliente === id) || {};
-  const proximos = items.filter(n => n.dias_habiles_restantes !== null && n.dias_habiles_restantes >= 0);
-  const vencidos = items.filter(n => n.dias_habiles_restantes !== null && n.dias_habiles_restantes < 0);
+  const proximos = items.filter(enPeriodo).filter(n => n.dias_habiles_restantes !== null && n.dias_habiles_restantes >= 0);
+  const vencidos = items.filter(enPeriodo).filter(n => n.dias_habiles_restantes !== null && n.dias_habiles_restantes < 0);
 
   const actualizar = () => { cargar(); onCambio && onCambio(); };
 

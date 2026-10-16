@@ -263,6 +263,24 @@ def eliminar_notificacion(id_notificacion: int, db: Session = Depends(database.g
     return {"mensaje": "Notificación eliminada correctamente."}
 
 
+@router.post("/notificaciones/marcar-respondidas")
+def marcar_antiguas_respondidas(antes_de: str, db: Session = Depends(database.get_db)):
+    """Marca como respondidas (y ya notificadas) las notificaciones publicadas antes de una fecha."""
+    fecha = plazos.parsear_fecha(antes_de)
+    if not fecha:
+        raise HTTPException(status_code=400, detail="Fecha inválida. Use el formato AAAA-MM-DD.")
+    antiguas = [n for n in db.query(models.Notificacion).filter(models.Notificacion.estado != "respondida").all()
+                if (plazos.parsear_fecha(n.fecha_aviso) or fecha) < fecha]
+    for n in antiguas:
+        n.estado = "respondida"
+        n.notificacion_enviada = True
+        n.fecha_gestion = datetime.utcnow()
+        if not n.notas:
+            n.notas = f"Marcada como resuelta en bloque (anterior a {fecha.isoformat()})"
+    db.commit()
+    return {"marcadas": len(antiguas)}
+
+
 @router.post("/notificaciones/enviar-pendientes")
 def reenviar_pendientes(db: Session = Depends(database.get_db)):
     resultado = enviar_alertas_pendientes(db)
