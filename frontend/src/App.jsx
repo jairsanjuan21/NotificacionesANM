@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE, BadgeUrgencia, CeldaPlazo, SelectorEstado, CeldaDocumento } from './componentes';
+import Vencimientos from './Vencimientos';
+import Monitoreo from './Monitoreo';
 
-const API_BASE = import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api';
+const botonPestana = (activa) => ({
+  padding: '10px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold',
+  background: activa ? '#1f3a52' : '#ecf0f1', color: activa ? 'white' : '#2c3e50'
+});
 
 const REGIONALES_ANM = [
   { id: 'bogota', label: 'Bogotá' },
@@ -40,7 +46,7 @@ const parsearFechaANM = (fechaStr) => {
 };
 
 function App() {
-  const [pestanaActiva, setPestanaActiva] = useState('boletines'); // 'boletines' | 'placas'
+  const [pestanaActiva, setPestanaActiva] = useState('boletines'); // 'boletines' | 'vencimientos' | 'placas' | 'monitoreo'
   const [clientes, setClientes] = useState([]);
   const [notificaciones, setNotificaciones] = useState([]);
   
@@ -49,12 +55,16 @@ function App() {
   const [filtroRegional, setFiltroRegional] = useState('todas');
   const [filtroEstado, setFiltroEstado] = useState('todos'); // 'todos' | 'con_boletines' | 'sin_boletines'
   const [criterioOrden, setCriterioOrden] = useState('fecha_desc'); // 'fecha_desc' | 'fecha_asc' | 'placa_asc'
+  const [filtroGestion, setFiltroGestion] = useState('todas'); // 'todas' | 'sin_responder' | 'urgentes'
 
   // Estados para formulario CRUD de Placa
   const [editandoId, setEditandoId] = useState(null);
   const [formPlaca, setFormPlaca] = useState('');
   const [formNombre, setFormNombre] = useState('');
   const [formRegionales, setFormRegionales] = useState(['bucaramanga']);
+  const [formEmail, setFormEmail] = useState('');
+  const [formNit, setFormNit] = useState('');
+  const [importando, setImportando] = useState(false);
 
   // Estados para el motor de sincronización (Scraper)
   const [escaneandoGlobal, setEscaneandoGlobal] = useState(false);
@@ -94,7 +104,9 @@ function App() {
       placa: formPlaca.trim().toUpperCase(),
       nombre_empresa: formNombre.trim().toUpperCase() || 'SIN NOMBRE',
       regional: formRegionales.join(','),
-      activo: true
+      activo: true,
+      email: formEmail.trim(),
+      nit: formNit.trim()
     };
 
     try {
@@ -118,6 +130,8 @@ function App() {
       ? cliente.regional.split(',').map(r => r.trim().toLowerCase()).filter(r => r !== 'all')
       : ['bucaramanga'];
     setFormRegionales(regs.length > 0 ? regs : ['bucaramanga']);
+    setFormEmail(cliente.email || '');
+    setFormNit(cliente.nit || '');
     setPestanaActiva('placas');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -147,6 +161,28 @@ function App() {
     setFormPlaca('');
     setFormNombre('');
     setFormRegionales(['bucaramanga']);
+    setFormEmail('');
+    setFormNit('');
+  };
+
+  const importarArchivo = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo) return;
+    setImportando(true);
+    try {
+      const datos = new FormData();
+      datos.append('archivo', archivo);
+      const res = await axios.post(`${API_BASE}/clientes/importar`, datos);
+      const { creados, actualizados, omitidos } = res.data;
+      alert(`Importación completada:\n• ${creados} placas nuevas\n• ${actualizados} actualizadas` +
+        (omitidos.length ? `\n• Omitidas:\n  ${omitidos.join('\n  ')}` : ''));
+      cargarDatos();
+    } catch (error) {
+      alert('Error al importar: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setImportando(false);
+    }
   };
 
   const consultarBoletinesNuevos = async (idCliente = null, nombrePlaca = '') => {
@@ -172,7 +208,11 @@ function App() {
       );
       await cargarDatos();
     } catch (error) {
-      alert("Error ejecutando la consulta en la ANM: " + (error.response?.data?.detail || error.message));
+      if (error.response?.status === 409) {
+        alert(error.response.data.detail);
+      } else {
+        alert("Error ejecutando la consulta en la ANM: " + (error.response?.data?.detail || error.message));
+      }
     } finally {
       setEscaneandoGlobal(false);
       setEscaneandoClienteId(null);
@@ -183,6 +223,10 @@ function App() {
   const clientesProcesados = clientes.map(cliente => {
     const notifsOrdenadas = notificaciones
       .filter(n => n.id_cliente === cliente.id_cliente)
+      .filter(n =>
+        filtroGestion === 'todas' ||
+        (filtroGestion === 'sin_responder' && n.estado !== 'respondida') ||
+        (filtroGestion === 'urgentes' && n.urgencia === 'alta' && n.estado !== 'respondida'))
       .sort((a, b) => {
         const diffFecha = parsearFechaANM(b.fecha_aviso) - parsearFechaANM(a.fecha_aviso);
         return diffFecha !== 0 ? diffFecha : b.id_notificacion - a.id_notificacion;
@@ -220,7 +264,9 @@ function App() {
         (filtroEstado === 'con_boletines' && c.notificacionesOrdenadas.length > 0) ||
         (filtroEstado === 'sin_boletines' && c.notificacionesOrdenadas.length === 0);
 
-      return coincideTexto && coincideRegion && coincideEstado;
+      const coincideGestion = filtroGestion === 'todas' || c.notificacionesOrdenadas.length > 0;
+
+      return coincideTexto && coincideRegion && coincideEstado && coincideGestion;
     })
     .sort((a, b) => {
       if (criterioOrden === 'fecha_desc') {
@@ -242,6 +288,9 @@ function App() {
   const fechaMasRecienteGlobal = clientesProcesados.reduce((max, c) => 
     c.ultimaFechaTimestamp > max.ts ? { ts: c.ultimaFechaTimestamp, txt: c.ultimaFechaTexto } : max
   , { ts: 0, txt: 'N/A' }).txt;
+  const porVencer = notificaciones.filter(n =>
+    n.estado !== 'respondida' && n.dias_habiles_restantes !== null && n.dias_habiles_restantes >= 0 && n.dias_habiles_restantes <= 5).length;
+  const urgentesSinGestion = notificaciones.filter(n => n.urgencia === 'alta' && n.estado === 'nueva').length;
 
   return (
     <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '1200px', margin: '0 auto', padding: '20px', color: '#2c3e50' }}>
@@ -253,27 +302,13 @@ function App() {
           <span style={{ color: '#7f8c8d', fontSize: '14px' }}>Vigilancia automatizada de Estados y Avisos por Punto de Atención Regional</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => setPestanaActiva('boletines')}
-            style={{
-              padding: '10px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold',
-              background: pestanaActiva === 'boletines' ? '#1f3a52' : '#ecf0f1',
-              color: pestanaActiva === 'boletines' ? 'white' : '#2c3e50'
-            }}
-          >
-            📄 Boletines y Consulta ANM
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => setPestanaActiva('boletines')} style={botonPestana(pestanaActiva === 'boletines')}>📄 Boletines</button>
+          <button onClick={() => setPestanaActiva('vencimientos')} style={botonPestana(pestanaActiva === 'vencimientos')}>
+            📅 Vencimientos{porVencer > 0 && <span style={{ marginLeft: '6px', background: '#c0392b', color: 'white', borderRadius: '10px', padding: '1px 7px', fontSize: '12px' }}>{porVencer}</span>}
           </button>
-          <button
-            onClick={() => setPestanaActiva('placas')}
-            style={{
-              padding: '10px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold',
-              background: pestanaActiva === 'placas' ? '#1f3a52' : '#ecf0f1',
-              color: pestanaActiva === 'placas' ? 'white' : '#2c3e50'
-            }}
-          >
-            ⚙️ Gestionar Placas y Regiones
-          </button>
+          <button onClick={() => setPestanaActiva('placas')} style={botonPestana(pestanaActiva === 'placas')}>⚙️ Placas</button>
+          <button onClick={() => setPestanaActiva('monitoreo')} style={botonPestana(pestanaActiva === 'monitoreo')}>🩺 Monitoreo</button>
         </div>
       </header>
 
@@ -291,9 +326,18 @@ function App() {
           <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold', textTransform: 'uppercase' }}>Último Aviso Registrado</div>
           <div style={{ fontSize: '22px', fontWeight: 'bold', marginTop: '4px', color: '#2c3e50' }}>{fechaMasRecienteGlobal}</div>
         </div>
+        <div onClick={() => setPestanaActiva('vencimientos')} style={{ cursor: 'pointer', background: '#ffffff', border: '1px solid #e1e8ed', borderLeft: '4px solid #c0392b', padding: '14px 18px', borderRadius: '8px' }}>
+          <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold', textTransform: 'uppercase' }}>Vencen en ≤ 5 días hábiles</div>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px', color: porVencer ? '#c0392b' : '#2c3e50' }}>{porVencer}</div>
+        </div>
+        <div onClick={() => { setFiltroGestion('urgentes'); setPestanaActiva('boletines'); }} style={{ cursor: 'pointer', background: '#ffffff', border: '1px solid #e1e8ed', borderLeft: '4px solid #d35400', padding: '14px 18px', borderRadius: '8px' }}>
+          <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold', textTransform: 'uppercase' }}>Urgentes sin revisar</div>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px', color: urgentesSinGestion ? '#d35400' : '#2c3e50' }}>{urgentesSinGestion}</div>
+        </div>
       </div>
 
       {/* BARRA DE FILTROS Y SINCRONIZACIÓN */}
+      {(pestanaActiva === 'boletines' || pestanaActiva === 'placas') && (
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: '#f8f9fa', padding: '14px', borderRadius: '8px', alignItems: 'center', flexWrap: 'wrap', border: '1px solid #e9ecef' }}>
         <input
           type="text"
@@ -335,6 +379,18 @@ function App() {
         </select>
 
         {pestanaActiva === 'boletines' && (
+          <select
+            value={filtroGestion}
+            onChange={(e) => setFiltroGestion(e.target.value)}
+            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
+          >
+            <option value="todas">🗂️ Todas las notificaciones</option>
+            <option value="sin_responder">🛠️ Sin responder</option>
+            <option value="urgentes">🚨 Urgentes sin responder</option>
+          </select>
+        )}
+
+        {pestanaActiva === 'boletines' && (
           <button
             onClick={() => consultarBoletinesNuevos(null)}
             disabled={escaneandoGlobal || escaneandoClienteId !== null}
@@ -347,6 +403,7 @@ function App() {
           </button>
         )}
       </div>
+      )}
 
       {mensajeSync && (
         <div style={{ padding: '12px 16px', background: '#d4edda', color: '#155724', borderRadius: '6px', marginBottom: '20px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -388,6 +445,33 @@ function App() {
                 </div>
               </div>
 
+              <div style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '2', minWidth: '280px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>
+                    Correo del titular (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Si lo llena, el titular también recibe sus notificaciones. Varios: separados por coma"
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    style={{ width: '100%', padding: '9px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ flex: '1', minWidth: '180px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>
+                    NIT / C.C. (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Para buscar en cobro coactivo"
+                    value={formNit}
+                    onChange={(e) => setFormNit(e.target.value)}
+                    style={{ width: '100%', padding: '9px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>
                   Punto de Atención Regional ANM (Puedes marcar más de una si comparte sede):
@@ -419,6 +503,18 @@ function App() {
             </form>
           </div>
 
+          <div style={{ background: '#f8f9fa', border: '1px dashed #95a5a6', padding: '14px 20px', borderRadius: '8px', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <strong>📥 Importar placas desde Excel o CSV</strong>
+            <span style={{ fontSize: '13px', color: '#7f8c8d', flex: 1, minWidth: '220px' }}>
+              Columnas: placa, titular, regional, email, nit. Las placas existentes se actualizan.
+            </span>
+            <a href={`${API_BASE}/clientes/plantilla`} style={{ fontSize: '13px', color: '#2980b9' }}>Descargar plantilla</a>
+            <label style={{ padding: '9px 16px', background: importando ? '#95a5a6' : '#16a085', color: 'white', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+              {importando ? '⏳ Importando…' : 'Elegir archivo'}
+              <input type="file" accept=".xlsx,.csv" onChange={importarArchivo} disabled={importando} style={{ display: 'none' }} />
+            </label>
+          </div>
+
           <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #dcdde1', borderRadius: '8px', overflow: 'hidden' }}>
             <thead style={{ background: '#1f3a52', color: 'white', textAlign: 'left' }}>
               <tr>
@@ -433,7 +529,16 @@ function App() {
               {clientesFiltradosYOrdenados.map(c => (
                 <tr key={c.id_cliente} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '12px', fontWeight: 'bold' }}>{c.placa}</td>
-                  <td style={{ padding: '12px' }}>{c.nombre_empresa}</td>
+                  <td style={{ padding: '12px' }}>
+                    {c.nombre_empresa}
+                    {(c.email || c.nit) && (
+                      <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                        {c.email && <span title="Recibe copia de sus notificaciones">✉️ {c.email}</span>}
+                        {c.email && c.nit && ' · '}
+                        {c.nit && <span>NIT {c.nit}</span>}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: '12px', color: c.ultimaFechaTexto ? '#27ae60' : '#95a5a6', fontWeight: 'bold', fontSize: '13px' }}>
                     {c.ultimaFechaTexto || 'Sin boletines'}
                   </td>
@@ -511,34 +616,37 @@ function App() {
                   </div>
                 </div>
 
+                <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead style={{ background: '#f1f2f6' }}>
                     <tr>
-                      <th style={{ padding: '10px 15px', width: '22%' }}>Fecha del Aviso</th>
-                      <th style={{ padding: '10px 15px' }}>Acto Administrativo / Resolución</th>
-                      <th style={{ padding: '10px 15px', width: '18%' }}>Estado de Alerta</th>
-                      <th style={{ padding: '10px 15px', width: '60px', textAlign: 'center' }}>Quitar</th>
+                      <th style={{ padding: '10px 12px', width: '105px' }}>Publicación</th>
+                      <th style={{ padding: '10px 12px' }}>Acto / Documento</th>
+                      <th style={{ padding: '10px 12px', width: '85px' }}>Urgencia</th>
+                      <th style={{ padding: '10px 12px', width: '130px' }}>Fecha límite</th>
+                      <th style={{ padding: '10px 12px', width: '165px' }}>Gestión</th>
+                      <th style={{ padding: '10px 12px', width: '85px' }}>Correo</th>
+                      <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>Quitar</th>
                     </tr>
                   </thead>
                   <tbody>
                     {notifsCliente.map(notif => {
                       const nombreDoc = decodeURIComponent(notif.url_pdf.split('/').pop());
                       return (
-                        <tr key={notif.id_notificacion} style={{ borderBottom: '1px solid #f1f2f6' }}>
-                          <td style={{ padding: '10px 15px', fontWeight: '500' }}>{notif.fecha_aviso}</td>
-                          <td style={{ padding: '10px 15px' }}>
-                            <a href={notif.url_pdf} target="_blank" rel="noopener noreferrer" style={{ color: '#2980b9', fontWeight: 'bold', textDecoration: 'none' }}>
-                              📄 {nombreDoc}
-                            </a>
-                          </td>
-                          <td style={{ padding: '10px 15px' }}>
+                        <tr key={notif.id_notificacion} style={{ borderBottom: '1px solid #f1f2f6', verticalAlign: 'top', background: notif.estado === 'respondida' ? '#fbfcfc' : 'white' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: '500' }}>{notif.fecha_aviso}</td>
+                          <td style={{ padding: '10px 12px' }}><CeldaDocumento notif={notif} /></td>
+                          <td style={{ padding: '10px 12px' }}><BadgeUrgencia notif={notif} /></td>
+                          <td style={{ padding: '10px 12px' }}><CeldaPlazo notif={notif} /></td>
+                          <td style={{ padding: '10px 12px' }}><SelectorEstado notif={notif} onCambio={cargarDatos} /></td>
+                          <td style={{ padding: '10px 12px', fontSize: '12px' }}>
                             {notif.notificacion_enviada ? (
-                              <span style={{ color: '#27ae60', fontWeight: 'bold' }}>✅ Notificado</span>
+                              <span style={{ color: '#27ae60', fontWeight: 'bold' }}>✅ Enviado</span>
                             ) : (
                               <span style={{ color: '#e67e22', fontWeight: 'bold' }}>⏳ Pendiente</span>
                             )}
                           </td>
-                          <td style={{ padding: '10px 15px', textAlign: 'center' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                             <button
                               onClick={() => eliminarNotificacionIndividual(notif.id_notificacion, nombreDoc)}
                               title="Desvincular esta resolución"
@@ -552,18 +660,21 @@ function App() {
                     })}
                     {notifsCliente.length === 0 && (
                       <tr>
-                        <td colSpan="4" style={{ padding: '14px', textAlign: 'center', color: '#7f8c8d' }}>
+                        <td colSpan="7" style={{ padding: '14px', textAlign: 'center', color: '#7f8c8d' }}>
                           Sin resoluciones registradas para esta placa.
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             );
           })}
         </div>
       )}
+      {pestanaActiva === 'vencimientos' && <Vencimientos clientes={clientes} onCambio={cargarDatos} />}
+      {pestanaActiva === 'monitoreo' && <Monitoreo onCambio={cargarDatos} />}
     </div>
   );
 }

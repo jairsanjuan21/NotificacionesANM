@@ -12,11 +12,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from database import models, database
+from database.migraciones import migrar
 from api import routes
 from scraper.anm_scraper import ejecutar_scraper
+from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
 
-# Crear tablas en la base de datos si no existen
-models.Base.metadata.create_all(bind=database.engine)
+# Crear tablas y agregar columnas nuevas sin perder datos
+migrar()
 
 # Definir zona horaria de Colombia
 ZONA_HORARIA_CO = pytz.timezone("America/Bogota")
@@ -29,10 +31,46 @@ def tarea_programada_scraper():
     ahora = datetime.now(ZONA_HORARIA_CO).strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n[CRON {ahora}] Iniciando barrido automático programado en la ANM...")
     try:
-        nuevas = ejecutar_scraper()
+        nuevas = ejecutar_scraper(origen="automatico", esperar=True)
         print(f"[CRON] Ejecución automática finalizada. Nuevas notificaciones: {nuevas}")
     except Exception as e:
         print(f"[CRON ERROR] Fallo durante la ejecución programada: {str(e)}")
+
+
+def tarea_recordatorios():
+    db = database.SessionLocal()
+    try:
+        print(f"[CRON] Recordatorios de vencimiento: {enviar_recordatorios(db)}")
+    except Exception as e:
+        print(f"[CRON ERROR] Recordatorios: {e}")
+    finally:
+        db.close()
+
+
+DIAS_SIN_BARRIDO_OK = int(os.getenv("DIAS_SIN_BARRIDO_OK", "3"))
+
+
+def tarea_vigilante():
+    """Alerta si hace varios días no hay un barrido exitoso (servidor dormido, errores repetidos, etc.)."""
+    db = database.SessionLocal()
+    try:
+        ultimo_ok = (db.query(models.Ejecucion).filter(models.Ejecucion.estado.in_(["ok", "con_alertas"]),
+                                                       models.Ejecucion.consultas_ok > 0)
+                     .order_by(models.Ejecucion.inicio.desc()).first())
+        if ultimo_ok is None:
+            hay_alguna = db.query(models.Ejecucion).count() > 0
+            if hay_alguna:
+                enviar_alerta_sistema("Ningún barrido exitoso registrado",
+                                      "Todos los barridos registrados han fallado. Revise los logs de Railway.")
+            return
+        dias = (datetime.utcnow() - ultimo_ok.inicio).days
+        if dias >= DIAS_SIN_BARRIDO_OK:
+            enviar_alerta_sistema(f"{dias} días sin un barrido exitoso",
+                                  f"El último barrido correcto fue el {ultimo_ok.inicio:%Y-%m-%d %H:%M} UTC.")
+    except Exception as e:
+        print(f"[CRON ERROR] Vigilante: {e}")
+    finally:
+        db.close()
 
 
 @asynccontextmanager
@@ -59,6 +97,16 @@ async def lifespan(app: FastAPI):
         max_instances=1,
         coalesce=True
     )
+
+    # 3. Recordatorios de vencimiento: todos los días a las 7:20 AM
+    scheduler.add_job(tarea_recordatorios, CronTrigger(hour=7, minute=20, timezone=ZONA_HORARIA_CO),
+                      id="recordatorios", name="Recordatorios de vencimiento (7:20 AM)",
+                      replace_existing=True, max_instances=1, coalesce=True)
+
+    # 4. Vigilante de salud: todos los días a las 9:10 AM
+    scheduler.add_job(tarea_vigilante, CronTrigger(hour=9, minute=10, timezone=ZONA_HORARIA_CO),
+                      id="vigilante", name="Vigilante de salud del sistema (9:10 AM)",
+                      replace_existing=True, max_instances=1, coalesce=True)
 
     scheduler.start()
     print("\n=======================================================")

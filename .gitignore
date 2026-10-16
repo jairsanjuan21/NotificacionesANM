@@ -11,3 +11,6 @@ venv/
 # Node
 node_modules/
 frontend/dist/
+
+# Copias de PDF archivadas en local
+backend/archivo_pdfs/

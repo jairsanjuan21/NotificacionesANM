@@ -25,3 +25,9 @@ PyMuPDF==1.28.2
 APScheduler==3.11.3
 pytz==2026.5
 tzlocal==5.4.4
+holidays==0.106
+openpyxl==3.1.5
+python-dateutil==2.9.0.post0
+python-multipart==0.0.32
+six==1.17.0
+et_xmlfile==2.0.0
