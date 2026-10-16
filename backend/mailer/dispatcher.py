@@ -1,110 +1,173 @@
 import os
-import sys
 import smtplib
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+from database.models import Notificacion, Cliente
 
-# Ajuste de ruta para importar módulos desde la raíz
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from database.database import SessionLocal
-from database.models import Cliente, Notificacion
-
-# Cargar variables del archivo .env
 load_dotenv()
 
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SENDER_EMAIL = os.getenv("EMAIL_SENDER")
-SENDER_PASSWORD = os.getenv("EMAIL_PASSWORD")
-RECEIVER_EMAIL = os.getenv("EMAIL_RECEIVER")
+print("Iniciando Módulo de Mensajería (Email Dispatcher)...")
 
-def enviar_alertas_pendientes():
-    print("Iniciando Módulo de Mensajería (Email Dispatcher)...")
-    db: Session = SessionLocal()
-    
-    try:
-        # 1. Consultar el Delta (Solo las no enviadas)
-        pendientes = db.query(Notificacion).filter(Notificacion.notificacion_enviada == False).all()
-        
-        if not pendientes:
-            print("No hay notificaciones pendientes por enviar.")
-            return
-            
-        print(f"Compilando {len(pendientes)} notificaciones pendientes...")
 
-        # 2. Construir la plantilla HTML del correo
-        html_content = """
-        <html>
-          <body style="font-family: Arial, sans-serif; color: #333;">
-            <div style="background-color: #2c3e50; padding: 15px; border-radius: 5px 5px 0 0;">
-                <h2 style="color: white; margin: 0;">Nuevas notificaciones ANM Detectadas</h2>
-            </div>
-            <div style="padding: 15px; border: 1px solid #ddd; border-top: none;">
-                <p>Ing. Samir Sanjuan, el motor de extracción automático ha identificado novedades en los siguientes expedientes:</p>
-                <table border="1" cellpadding="10" cellspacing="0" style="border-collapse: collapse; width: 100%; text-align: left;">
-                  <tr style="background-color: #f2f2f2;">
-                    <th>Cliente / Placa</th>
-                    <th>Fecha del Boletín</th>
-                    <th>Enlace Oficial</th>
-                  </tr>
+def _enviar_via_brevo_o_smtp(remitente: str, destinatario: str, password: str, asunto: str, cuerpo_html: str):
+    """
+    Envía el correo usando la API HTTP de Brevo (Puerto 443) si BREVO_API_KEY está configurada.
+    Si no existe BREVO_API_KEY, utiliza SMTP tradicional (Puerto 465) como respaldo local.
+    """
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+
+    # Soporta uno o varios correos separados por coma en EMAIL_RECEIVER
+    lista_correos = [c.strip() for c in destinatario.split(",") if c.strip()]
+
+    # 1. MODO CLOUD / RAILWAY: API HTTP de Brevo (Puerto 443 - Evita [Errno 101] Network is unreachable)
+    if brevo_api_key:
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": brevo_api_key,
+            "content-type": "application/json"
+        }
+        payload = {
+            "sender": {
+                "name": "Sistema de Monitoreo Minero ANM",
+                "email": remitente
+            },
+            "to": [{"email": c} for c in lista_correos],
+            "subject": asunto,
+            "htmlContent": cuerpo_html
+        }
+
+        response = requests.post(url, json=payload, headers=headers, timeout=20)
+        if response.status_code not in (200, 201, 202):
+            raise Exception(f"Error API Brevo ({response.status_code}): {response.text}")
+
+        print(f"[DISPATCHER HTTP] Correo enviado exitosamente vía Brevo a: {', '.join(lista_correos)}")
+        return True
+
+    # 2. MODO LOCAL: SMTP SSL (Puerto 465)
+    if not password:
+        raise Exception("No se encontró BREVO_API_KEY ni EMAIL_PASSWORD en las variables de entorno.")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = remitente
+    msg["To"] = ", ".join(lista_correos)
+    msg.attach(MIMEText(cuerpo_html, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as server:
+        server.login(remitente, password)
+        server.sendmail(remitente, lista_correos, msg.as_string())
+
+    print(f"[DISPATCHER SMTP] Correo enviado exitosamente vía SMTP local a: {', '.join(lista_correos)}")
+    return True
+
+
+def enviar_alertas_pendientes(db: Session):
+    """
+    Busca en SQLite todas las notificaciones con notificacion_enviada == False,
+    construye el reporte HTML consolidado, lo envía por correo y actualiza el estado.
+    """
+    pendientes = (
+        db.query(Notificacion)
+        .join(Cliente, Notificacion.id_cliente == Cliente.id_cliente)
+        .filter(Notificacion.notificacion_enviada == False)
+        .all()
+    )
+
+    if not pendientes:
+        print("[DISPATCHER] No hay notificaciones pendientes por enviar.")
+        return {"enviadas": 0, "mensaje": "Sin notificaciones pendientes."}
+
+    remitente = os.getenv("EMAIL_SENDER")
+    destinatario = os.getenv("EMAIL_RECEIVER")
+    password = os.getenv("EMAIL_PASSWORD")
+
+    if not remitente or not destinatario:
+        print("[ERROR DISPATCHER] Faltan las variables EMAIL_SENDER o EMAIL_RECEIVER.")
+        return {"enviadas": 0, "error": "Credenciales de remitente/destinatario incompletas."}
+
+    # Construcción de las filas de la tabla HTML
+    filas_html = ""
+    for notif in pendientes:
+        cliente = notif.cliente
+        placa = getattr(cliente, "placa", "N/A")
+        titular = getattr(cliente, "nombre_cliente", getattr(cliente, "titular", "Titular Registrado"))
+        par = getattr(cliente, "par", getattr(cliente, "regional", "ANM"))
+        nombre_archivo = notif.url_pdf.split("/")[-1] if notif.url_pdf else "Documento PDF"
+
+        filas_html += f"""
+        <tr>
+            <td style="padding: 10px; border: 1px solid #d1d5db; font-weight: bold; color: #1e293b;">{placa}</td>
+            <td style="padding: 10px; border: 1px solid #d1d5db; color: #334155;">{titular}</td>
+            <td style="padding: 10px; border: 1px solid #d1d5db; text-align: center; color: #475569;">{par}</td>
+            <td style="padding: 10px; border: 1px solid #d1d5db; text-align: center; color: #475569;">{notif.fecha_aviso}</td>
+            <td style="padding: 10px; border: 1px solid #d1d5db; text-align: center;">
+                <a href="{notif.url_pdf}" target="_blank" style="background-color: #2563eb; color: #ffffff; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 13px;">
+                    📄 {nombre_archivo[:30]}
+                </a>
+            </td>
+        </tr>
         """
-        
-        # Inyectar las filas dinámicamente
-        for notif in pendientes:
-            cliente = db.query(Cliente).filter(Cliente.id_cliente == notif.id_cliente).first()
-            html_content += f"""
-                  <tr>
-                    <td><strong>{cliente.placa}</strong><br><small>{cliente.nombre_empresa}</small></td>
-                    <td>{notif.fecha_aviso}</td>
-                    <td>
-                        <a href="{notif.url_pdf}" style="color: #2980b9; font-weight: bold; text-decoration: none;">
-                            📄 Abrir PDF
-                        </a>
-                    </td>
-                  </tr>
-            """
-            
-        html_content += """
+
+    asunto = f"🔔 Alerta Minera ANM: {len(pendientes)} Nueva(s) Notificación(es) Detectada(s)"
+
+    cuerpo_html = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
+        <div style="max-width: 800px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #1e3a8a; color: #ffffff; padding: 18px 24px;">
+                <h2 style="margin: 0; font-size: 20px;">Sistema de Monitoreo Minero ANM</h2>
+                <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Reporte automático de Estados y Resoluciones</p>
+            </div>
+            <div style="padding: 24px;">
+                <p>Se han detectado <strong>{len(pendientes)}</strong> nuevas actuaciones asociadas a los títulos monitoreados:</p>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px;">
+                    <thead>
+                        <tr style="background-color: #f3f4f6; text-align: left;">
+                            <th style="padding: 10px; border: 1px solid #d1d5db;">Placa</th>
+                            <th style="padding: 10px; border: 1px solid #d1d5db;">Titular</th>
+                            <th style="padding: 10px; border: 1px solid #d1d5db; text-align: center;">PAR</th>
+                            <th style="padding: 10px; border: 1px solid #d1d5db; text-align: center;">Fecha Aviso</th>
+                            <th style="padding: 10px; border: 1px solid #d1d5db; text-align: center;">Documento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filas_html}
+                    </tbody>
                 </table>
-                <p style="font-size: 12px; color: #7f8c8d; margin-top: 25px;">
-                  Este es un mensaje generado automáticamente por el sistema de monitoreo RPA.
-                </p>
             </div>
-          </body>
-        </html>
-        """
+        </div>
+    </body>
+    </html>
+    """
 
-        # 3. Ensamblar y enviar el paquete SMTP
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🔔 Alerta ANM: {len(pendientes)} nuevas notificaciones"
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = RECEIVER_EMAIL
-        msg.attach(MIMEText(html_content, "html"))
+    try:
+        _enviar_via_brevo_o_smtp(
+            remitente=remitente,
+            destinatario=destinatario,
+            password=password,
+            asunto=asunto,
+            cuerpo_html=cuerpo_html
+        )
 
-        print("Conectando al servidor SMTP de Google...")
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()  # Encriptar la conexión
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
-        server.quit()
-        
-        print("Correo de alerta entregado exitosamente.")
-
-        # 4. Actualizar el estado en la base de datos (Transacción)
+        # Marcar como enviadas en la base de datos una vez confirmado el envío HTTP/SMTP
         for notif in pendientes:
             notif.notificacion_enviada = True
         db.commit()
-        
-        print("Estado de registros actualizado a '✅ Enviado'.")
+
+        print(f"[SUCCESS] {len(pendientes)} notificaciones marcadas como enviadas en SQLite.")
+        return {"enviadas": len(pendientes), "mensaje": "Notificaciones despachadas con éxito."}
 
     except Exception as e:
-        print(f"[CRITICAL] Falla en el protocolo SMTP o Base de Datos: {str(e)}")
         db.rollback()
-    finally:
-        db.close()
+        print(f"[CRITICAL] Falla en el protocolo de Correo o Base de Datos: {e}")
+        return {"enviadas": 0, "error": str(e)}
 
-if __name__ == "__main__":
-    enviar_alertas_pendientes()
+
+# Alias de compatibilidad por si acaso
+despachar_notificaciones = enviar_alertas_pendientes
+ejecutar_dispatcher = enviar_alertas_pendientes
+enviar_alertas = enviar_alertas_pendientes
