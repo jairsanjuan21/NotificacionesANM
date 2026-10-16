@@ -2,10 +2,13 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
+# Ruta exacta a /app/backend/anm_notificaciones.db
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DB_PATH = os.path.join(BASE_DIR, "notificaciones_anm.db") # <-- Usa aquí el nombre exacto de tu archivo .db actual
+DB_PATH = os.path.join(BASE_DIR, "anm_notificaciones.db")
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
+print(f"[DB INFO] Conectando a SQLite en: {DB_PATH} (Existe: {os.path.exists(DB_PATH)})")
+
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
