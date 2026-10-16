@@ -20,7 +20,7 @@ class Notificacion(Base):
     id_notificacion = Column(Integer, primary_key=True, index=True)
     id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"))
     fecha_aviso = Column(String, nullable=True)
-    url_pdf = Column(String, unique=True, nullable=False)
+    url_pdf = Column(String, nullable=False)
     fecha_registro = Column(DateTime, default=datetime.utcnow)
     notificacion_enviada = Column(Boolean, default=False)
 
