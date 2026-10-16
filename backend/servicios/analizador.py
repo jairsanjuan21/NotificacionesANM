@@ -125,17 +125,19 @@ def clasificar_urgencia(texto_norm: str, fuente: str = "avisos", tipo_notificaci
 _ultimo_llamado_ia = [0.0]
 
 
-def resumir_con_ia(texto: str):
+def generar_resumen_ia(texto: str):
     """
-    Usa la capa gratuita de Google Gemini si existe GEMINI_API_KEY. Devuelve el
-    resumen o None (sin clave, sin texto o si falla: nunca detiene el barrido).
+    Llama a la capa gratuita de Google Gemini. Devuelve (resumen, error):
+    resumen es None si no se pudo generar y error explica el motivo.
     Nota: en la capa gratuita Google puede usar los textos para mejorar sus
     productos; los actos de la ANM ya son públicos.
     """
     clave = os.getenv("GEMINI_API_KEY")
-    if not clave or len(texto.strip()) < 80:
-        return None
-    modelo = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
+    if not clave:
+        return None, "No está configurada la variable GEMINI_API_KEY."
+    if len((texto or "").strip()) < 80:
+        return None, "El PDF no tiene texto legible (posiblemente es un documento escaneado)."
+    modelo = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
     # Respetar el límite de solicitudes por minuto de la capa gratuita
     espera = 4.5 - (time.time() - _ultimo_llamado_ia[0])
@@ -157,10 +159,26 @@ def resumir_con_ia(texto: str):
             timeout=30,
         )
         if r.status_code != 200:
-            print(f"    [IA] Gemini respondió {r.status_code}: {r.text[:200]}")
-            return None
-        partes = r.json()["candidates"][0]["content"]["parts"]
-        return " ".join(p.get("text", "") for p in partes).strip() or None
+            print(f"    [IA] Gemini respondió {r.status_code}: {r.text[:300]}")
+            motivo = {400: "solicitud inválida o clave incorrecta", 403: "la clave no tiene permiso",
+                      404: f"el modelo '{modelo}' no existe (revise GEMINI_MODEL)",
+                      429: "se agotó el cupo gratuito por ahora; intente más tarde"}.get(r.status_code, "error del servicio")
+            return None, f"Gemini respondió {r.status_code}: {motivo}. Detalle: {r.text[:300]}"
+        datos = r.json()
+        candidatos = datos.get("candidates") or []
+        if not candidatos:
+            return None, f"Gemini no devolvió respuesta (posible bloqueo de contenido): {str(datos)[:300]}"
+        partes = candidatos[0].get("content", {}).get("parts", [])
+        resumen = " ".join(p.get("text", "") for p in partes).strip()
+        return (resumen, None) if resumen else (None, "Gemini devolvió una respuesta vacía.")
     except Exception as e:
         print(f"    [IA] No se pudo generar resumen: {e}")
+        return None, f"No se pudo conectar con Gemini: {e}"
+
+
+def resumir_con_ia(texto: str):
+    """Versión silenciosa para el barrido: devuelve el resumen o None (nunca detiene el proceso)."""
+    if not os.getenv("GEMINI_API_KEY"):
         return None
+    resumen, _ = generar_resumen_ia(texto)
+    return resumen

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import axios from 'axios';
 
 export const API_BASE = import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api';
@@ -94,7 +95,32 @@ export function SelectorEstado({ notif, onCambio }) {
   );
 }
 
-export function CeldaDocumento({ notif }) {
+function BotonResumir({ notif, onCambio }) {
+  const [cargando, setCargando] = useState(false);
+  const resumir = async () => {
+    setCargando(true);
+    try {
+      await axios.post(`${API_BASE}/notificaciones/${notif.id_notificacion}/resumir`);
+      onCambio && onCambio();
+    } catch (e) {
+      alert('No se pudo generar el resumen:\n\n' + (e.response?.data?.detail || e.message));
+    } finally {
+      setCargando(false);
+    }
+  };
+  return (
+    <button
+      onClick={resumir}
+      disabled={cargando}
+      title={notif.resumen ? 'Volver a generar el resumen' : 'Generar un resumen corto con Gemini'}
+      style={{ marginTop: '4px', background: cargando ? '#ecf0f1' : '#f4ecf7', color: '#7d3c98', border: '1px solid #d2b4de', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', cursor: cargando ? 'wait' : 'pointer', fontWeight: 'bold' }}
+    >
+      {cargando ? '⏳ Leyendo el acto…' : notif.resumen ? '↻ Regenerar resumen' : '✨ Resumir con IA'}
+    </button>
+  );
+}
+
+export function CeldaDocumento({ notif, onCambio }) {
   const nombreDoc = decodeURIComponent(notif.url_pdf.split('/').pop());
   const etiquetas = [notif.tipo_notificacion, notif.tipo_acto, notif.numero && `No. ${notif.numero}`].filter(Boolean);
   return (
@@ -115,9 +141,10 @@ export function CeldaDocumento({ notif }) {
       {etiquetas.length > 0 && <div style={{ fontSize: '12px', color: '#566573', marginTop: '3px' }}>{etiquetas.join(' · ')}</div>}
       {(notif.resumen || notif.motivo_urgencia) && (
         <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '3px', fontStyle: notif.resumen ? 'normal' : 'italic' }}>
-          {notif.resumen || `Detectado: ${notif.motivo_urgencia}`}
+          {notif.resumen ? <><strong style={{ color: '#7d3c98' }}>✨ </strong>{notif.resumen}</> : `Detectado: ${notif.motivo_urgencia}`}
         </div>
       )}
+      <BotonResumir notif={notif} onCambio={onCambio} />
     </div>
   );
 }

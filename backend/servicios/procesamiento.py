@@ -12,6 +12,25 @@ def _es_boletin_general(url: str) -> bool:
     return "notificaciones_por_avisos_tablas" in u or "boletin" in u.split("/")[-1]
 
 
+def texto_de_notificacion(notif, sesion_http=None) -> str:
+    """Texto del PDF de la notificación: usa la copia archivada o lo descarga y archiva."""
+    placa = notif.cliente.placa if notif.cliente else ""
+    contenido = None
+    if notif.archivo_local and os.path.exists(notif.archivo_local):
+        with open(notif.archivo_local, "rb") as f:
+            contenido = f.read()
+    else:
+        r = (sesion_http or requests.Session()).get(notif.url_pdf, timeout=30)
+        if r.status_code != 200 or r.content[:4] != b"%PDF":
+            raise Exception(f"No se pudo descargar el PDF de la ANM (HTTP {r.status_code}).")
+        contenido = r.content
+        notif.archivo_local = analizador.archivar_pdf(notif.id_notificacion, notif.url_pdf, contenido)
+    texto = analizador.extraer_texto_pdf(contenido)
+    if _es_boletin_general(notif.url_pdf) and placa:
+        texto = analizador.fragmento_de_placa(texto, placa) or texto
+    return texto
+
+
 def procesar_notificacion(notif, sesion_http=None, cache_pdfs=None, usar_ia=True, contador_ia=None) -> None:
     """Modifica `notif` en memoria; quien llama hace el commit. Nunca lanza excepción."""
     sesion_http = sesion_http or requests.Session()

@@ -48,7 +48,7 @@ export default function Vencimientos({ clientes, onCambio }) {
                 <div style={{ fontSize: '12px', color: '#7f8c8d' }}>{c.nombre_empresa}</div>
                 <div style={{ fontSize: '11px', color: '#95a5a6' }}>Publicado: {n.fecha_aviso}</div>
               </td>
-              <td style={{ padding: '10px' }}><CeldaDocumento notif={n} /></td>
+              <td style={{ padding: '10px' }}><CeldaDocumento notif={n} onCambio={actualizar} /></td>
               <td style={{ padding: '10px' }}><BadgeUrgencia notif={n} /></td>
               <td style={{ padding: '10px' }}><SelectorEstado notif={n} onCambio={actualizar} /></td>
             </tr>

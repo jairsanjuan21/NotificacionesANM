@@ -231,6 +231,28 @@ def descargar_copia_pdf(id_notificacion: int, db: Session = Depends(database.get
                         filename=os.path.basename(notif.archivo_local), content_disposition_type="inline")
 
 
+@router.post("/notificaciones/{id_notificacion}/resumir", response_model=schemas.NotificacionResponse)
+def resumir_notificacion(id_notificacion: int, db: Session = Depends(database.get_db)):
+    """Genera (o regenera) el resumen con IA de una notificación."""
+    from servicios.analizador import generar_resumen_ia
+    from servicios.procesamiento import texto_de_notificacion
+    notif = db.query(models.Notificacion).filter(models.Notificacion.id_notificacion == id_notificacion).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notificación no encontrada.")
+    try:
+        texto = texto_de_notificacion(notif)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    resumen, error = generar_resumen_ia(texto)
+    if error:
+        db.commit()  # conserva la copia archivada si se acaba de descargar
+        raise HTTPException(status_code=502, detail=error)
+    notif.resumen = resumen
+    db.commit()
+    db.refresh(notif)
+    return notif
+
+
 @router.delete("/notificaciones/{id_notificacion}")
 def eliminar_notificacion(id_notificacion: int, db: Session = Depends(database.get_db)):
     notif = db.query(models.Notificacion).filter(models.Notificacion.id_notificacion == id_notificacion).first()

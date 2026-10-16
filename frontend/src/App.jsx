@@ -635,7 +635,7 @@ function App() {
                       return (
                         <tr key={notif.id_notificacion} style={{ borderBottom: '1px solid #f1f2f6', verticalAlign: 'top', background: notif.estado === 'respondida' ? '#fbfcfc' : 'white' }}>
                           <td style={{ padding: '10px 12px', fontWeight: '500' }}>{notif.fecha_aviso}</td>
-                          <td style={{ padding: '10px 12px' }}><CeldaDocumento notif={notif} /></td>
+                          <td style={{ padding: '10px 12px' }}><CeldaDocumento notif={notif} onCambio={cargarDatos} /></td>
                           <td style={{ padding: '10px 12px' }}><BadgeUrgencia notif={notif} /></td>
                           <td style={{ padding: '10px 12px' }}><CeldaPlazo notif={notif} /></td>
                           <td style={{ padding: '10px 12px' }}><SelectorEstado notif={notif} onCambio={cargarDatos} /></td>
