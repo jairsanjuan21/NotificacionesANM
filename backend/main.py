@@ -90,8 +90,6 @@ app.add_middleware(
 # Registrar las rutas de la API
 app.include_router(routes.router, prefix="/api")
 
-
-# Endpoint de diagnóstico para verificar cuándo será el próximo barrido automático
 @app.get("/api/scheduler/estado")
 def obtener_estado_scheduler():
     jobs_info = []
