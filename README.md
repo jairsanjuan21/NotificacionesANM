@@ -68,6 +68,10 @@ resumen de errores del log cada 15 minutos, y: `/estado`, `/barridos`, `/errores
 |---|---|---|
 | `TG_CLIENTE_TOKEN` / `TG_CLIENTE_CHATS` | — | Bot del cliente: notificaciones nuevas y recordatorios (chat ids separados por coma). Acepta las antiguas `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`. |
 | `TG_ADMIN_TOKEN` / `TG_ADMIN_CHAT` | — | Bot del administrador: alertas de salud del sistema y barridos. |
+| `HC_BARRIDO_SEMANA` | — | healthchecks.io: URL de ping (o UUID) del chequeo de barridos L-V. Cron `30 8,17 * * 1-5`, zona America/Bogota. |
+| `HC_BARRIDO_DOMINGO` | — | healthchecks.io: chequeo del barrido del domingo. Cron `0 18 * * 0`, zona America/Bogota. |
+| `HC_LATIDO` | — | healthchecks.io: latido cada 10 min con autodiagnóstico (base de datos y espacio en disco). |
+| `HC_MIN_ESPACIO_LIBRE` | `0.10` | Fracción mínima de espacio libre en el Volume antes de reportar el latido como falla. |
 | `GEMINI_API_KEY` | — | Resumen con IA (capa gratuita de Google AI Studio). |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Modelo de Gemini. |
 | `GEMINI_MODELOS_RESPALDO` | `gemini-3.1-flash-lite,gemini-3.6-flash` | Modelos que se prueban si el principal está saturado o sin cupo. |

@@ -313,7 +313,7 @@ def _reservar_barrido(origen: str, esperar: bool, id_cliente: int = None) -> int
         db.close()
 
 
-def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None) -> int:
+def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None, hc: tuple = None) -> int:
     """Hace el barrido de una ejecución ya reservada. Siempre libera el candado al terminar."""
     print("Iniciando motor de extracción ANM (Avisos + Cobro coactivo)...")
     db: Session = SessionLocal()
@@ -389,6 +389,16 @@ def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None) -> i
         finally:
             db.close()
             LOCK_BARRIDO.release()
+            if hc:  # (chequeo, run_id) de healthchecks; solo los barridos automáticos lo traen
+                try:
+                    from servicios import healthchecks
+                    db_hc = SessionLocal()
+                    try:
+                        healthchecks.fin(hc[0], hc[1], *healthchecks.resultado_barrido(db_hc.get(Ejecucion, id_ejecucion)))
+                    finally:
+                        db_hc.close()
+                except Exception as e_hc:
+                    print(f"[!] No se pudo reportar el barrido a healthchecks: {e_hc}")
             try:
                 from servicios.bot_admin import notificar_fin_barrido
                 notificar_fin_barrido(id_ejecucion)
@@ -396,13 +406,21 @@ def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None) -> i
                 print(f"[!] No se pudo avisar el fin del barrido por Telegram: {e_tg}")
 
 
-def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", esperar: bool = False) -> int:
+def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", esperar: bool = False,
+                     chequeo: str = None) -> int:
     """
     Barrido SÍNCRONO (lo usa el cron). Devuelve el número de notificaciones nuevas.
     Si `esperar` es False y hay otro barrido en curso, lanza BarridoEnCurso.
+    `chequeo`: nombre del chequeo de healthchecks.io al que se reporta (solo barridos automáticos).
     """
-    id_ejecucion = _reservar_barrido(origen, esperar, id_cliente_especifico)
-    return _ejecutar_barrido(id_ejecucion, id_cliente_especifico)
+    from servicios import healthchecks
+    rid = healthchecks.inicio(chequeo)   # el "start" se envía antes de esperar el candado
+    try:
+        id_ejecucion = _reservar_barrido(origen, esperar, id_cliente_especifico)
+    except Exception as e:
+        healthchecks.fin(chequeo, rid, False, f"El barrido no pudo iniciar: {e}")
+        raise
+    return _ejecutar_barrido(id_ejecucion, id_cliente_especifico, hc=(chequeo, rid) if rid else None)
 
 
 def iniciar_barrido_en_segundo_plano(id_cliente_especifico: int = None, origen: str = "manual") -> int:

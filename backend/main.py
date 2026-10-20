@@ -25,7 +25,7 @@ from servicios import auth
 from scraper.anm_scraper import ejecutar_scraper, cerrar_barridos_huerfanos
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
 from servicios.telegram_bot import configurar_webhooks
-from servicios import bot_admin, contexto_app
+from servicios import bot_admin, contexto_app, healthchecks
 
 # Crear tablas y agregar columnas nuevas sin perder datos
 migrar()
@@ -38,11 +38,11 @@ scheduler = BackgroundScheduler(timezone=ZONA_HORARIA_CO)
 contexto_app.scheduler = scheduler  # para que el bot admin pueda consultar las tareas
 
 
-def tarea_programada_scraper():
+def tarea_programada_scraper(chequeo: str = None):
     ahora = datetime.now(ZONA_HORARIA_CO).strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n[CRON {ahora}] Iniciando barrido automático programado en la ANM...")
     try:
-        nuevas = ejecutar_scraper(origen="automatico", esperar=True)
+        nuevas = ejecutar_scraper(origen="automatico", esperar=True, chequeo=chequeo)
         print(f"[CRON] Ejecución automática finalizada. Nuevas notificaciones: {nuevas}")
     except Exception as e:
         print(f"[CRON ERROR] Fallo durante la ejecución programada: {str(e)}")
@@ -96,6 +96,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         tarea_programada_scraper,
         CronTrigger(day_of_week="mon-fri", hour="8,17", minute=30, timezone=ZONA_HORARIA_CO),
+        kwargs={"chequeo": "semana"},
         id="barrido_lun_vie",
         name="Barrido ANM Lunes a Viernes (8:30 AM y 5:30 PM)",
         replace_existing=True,
@@ -107,6 +108,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         tarea_programada_scraper,
         CronTrigger(day_of_week="sun", hour=18, minute=0, timezone=ZONA_HORARIA_CO),
+        kwargs={"chequeo": "domingo"},
         id="barrido_domingo",
         name="Barrido ANM Domingos (6:00 PM)",
         replace_existing=True,
@@ -130,10 +132,17 @@ async def lifespan(app: FastAPI):
                       id="resumen_errores", name="Resumen de errores por Telegram (cada 15 min)",
                       replace_existing=True, max_instances=1, coalesce=True)
 
+    # 6. Latido para healthchecks.io: cada 10 minutos (solo si HC_LATIDO está definido)
+    if healthchecks.configurado("latido"):
+        scheduler.add_job(healthchecks.latido, IntervalTrigger(minutes=10, timezone=ZONA_HORARIA_CO),
+                          id="latido", name="Latido para healthchecks.io (cada 10 min)",
+                          replace_existing=True, max_instances=1, coalesce=True)
+
     scheduler.start()
 
-    # 6. Bots de Telegram: registrar webhooks y avisar el arranque (en un hilo: no bloquea si Telegram falla)
+    # 7. Bots de Telegram: registrar webhooks y avisar el arranque (en un hilo: no bloquea si Telegram falla)
     def _arrancar_telegram():
+        healthchecks.latido()  # primer latido apenas arranca: confirma enseguida que el deploy quedó vivo
         try:
             bot_admin.aviso_arranque(huerfanos, configurar_webhooks())
         except Exception as e:
