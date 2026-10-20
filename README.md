@@ -36,6 +36,19 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 | Recordatorios de vencimiento | Todos los días 7:20 AM |
 | Vigilante de salud | Todos los días 9:10 AM |
 
+## Bots de Telegram
+
+Dos bots independientes, cada uno con su lista blanca de chats. Reciben mensajes por webhook
+(`/api/telegram/cliente` y `/api/telegram/admin`), que se registra solo al arrancar en Railway.
+Si alguien no autorizado escribe, el bot le muestra su chat ID y avisa al administrador.
+
+**Bot del cliente** — avisos de notificaciones nuevas y recordatorios de vencimiento (con botón de PDF), y:
+`/placa HAN-111` (o la placa sola), `/vencimientos`, `/ultimas`.
+
+**Bot del administrador** — resumen al terminar cada barrido, aviso al arrancar el servidor,
+resumen de errores del log cada 15 minutos, y: `/estado`, `/barridos`, `/errores`, `/logs [n]`,
+`/buscar texto`, `/auditoria`, `/barrer`.
+
 ## Variables de entorno (Railway → Variables)
 
 ### Obligatorias

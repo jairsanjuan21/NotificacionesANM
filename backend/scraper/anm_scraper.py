@@ -376,13 +376,24 @@ def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None) -> i
             if ejec.estado != "fallida":
                 ejec.estado = "con_alertas" if alertas_unicas else "ok"
             db.commit()
+            # Línea de cierre con el nivel correcto para el registro (FALLIDO = error, [!] = aviso)
+            marca = {"fallida": "FALLIDO", "con_alertas": "[!] con alertas"}.get(ejec.estado, "OK")
+            print(f"[BARRIDO #{id_ejecucion}] {marca}: {ejec.consultas_ok} consultas bien, "
+                  f"{ejec.consultas_error} con falla, {ejec.nuevas} nuevas")
             if alertas_unicas:
-                enviar_alerta_sistema("Problemas en el barrido de la ANM", "\n\n".join(alertas_unicas))
+                # El correo sigue saliendo; por Telegram ya va incluido en el resumen del barrido
+                enviar_alerta_sistema("Problemas en el barrido de la ANM", "\n\n".join(alertas_unicas),
+                                      telegram=False)
         except Exception as e_fin:
             print(f"[!] No se pudo registrar la ejecución: {e_fin}")
         finally:
             db.close()
             LOCK_BARRIDO.release()
+            try:
+                from servicios.bot_admin import notificar_fin_barrido
+                notificar_fin_barrido(id_ejecucion)
+            except Exception as e_tg:
+                print(f"[!] No se pudo avisar el fin del barrido por Telegram: {e_tg}")
 
 
 def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", esperar: bool = False) -> int:

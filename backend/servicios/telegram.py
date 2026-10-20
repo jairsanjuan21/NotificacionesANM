@@ -130,22 +130,24 @@ def llamar(canal: str, metodo: str, datos: dict = None, archivos: dict = None, t
                 time.sleep(espera)
                 continue
             if r.status_code != 200 or not cuerpo.get("ok"):
-                print(f"[TELEGRAM:{canal}] {metodo} respondió {r.status_code}: "
+                print(f"[TELEGRAM:{canal}] [!] {metodo} respondió {r.status_code}: "
                       f"{_sin_token(cuerpo.get('description') or r.text[:200])}")
                 return None
             return cuerpo.get("result")
         except Exception as e:
-            print(f"[TELEGRAM:{canal}] No se pudo llamar {metodo}: {_sin_token(e)}")
+            print(f"[TELEGRAM:{canal}] [!] No se pudo llamar {metodo}: {_sin_token(e)}")
             return None
     return None
 
 
 # ----------------------------------------------------------------------------- envío
 
-def enviar_mensaje(canal: str, texto_html: str, chat_id=None, botones: dict = None) -> bool:
+def enviar_mensaje(canal: str, texto_html: str, chat_id=None, botones: dict = None,
+                   silencioso: bool = False) -> bool:
     """
     Envía un mensaje HTML a un chat concreto o, si no se indica, a todos los chats del canal.
     Los botones (reply_markup) van solo en la última parte del mensaje.
+    silencioso=True: llega sin sonido ni vibración (para avisos de rutina).
     """
     if not _token(canal):
         print(f"[TELEGRAM:{canal}] Canal sin configurar; mensaje descartado.")
@@ -160,7 +162,7 @@ def enviar_mensaje(canal: str, texto_html: str, chat_id=None, botones: dict = No
     for chat in destinos:
         for i, parte in enumerate(partes):
             datos = {"chat_id": chat, "text": parte, "parse_mode": "HTML",
-                     "disable_web_page_preview": True}
+                     "disable_web_page_preview": True, "disable_notification": silencioso}
             if botones and i == len(partes) - 1:
                 datos["reply_markup"] = botones
             if llamar(canal, "sendMessage", datos) is None:
@@ -172,8 +174,8 @@ def notificar_cliente(texto_html: str, botones: dict = None) -> bool:
     return enviar_mensaje("cliente", texto_html, botones=botones)
 
 
-def notificar_admin(texto_html: str, botones: dict = None) -> bool:
-    return enviar_mensaje("admin", texto_html, botones=botones)
+def notificar_admin(texto_html: str, botones: dict = None, silencioso: bool = False) -> bool:
+    return enviar_mensaje("admin", texto_html, botones=botones, silencioso=silencioso)
 
 
 def enviar_telegram(texto_html: str) -> bool:

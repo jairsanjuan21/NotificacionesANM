@@ -283,8 +283,11 @@ def enviar_recordatorios(db: Session):
 
 # ======================================================================= Alertas del sistema
 
-def enviar_alerta_sistema(asunto: str, detalle: str):
-    """Avisa de un problema del propio sistema (barrido fallido, cambio en el portal, etc.)."""
+def enviar_alerta_sistema(asunto: str, detalle: str, telegram: bool = True):
+    """
+    Avisa de un problema del propio sistema (barrido fallido, cambio en el portal, etc.).
+    telegram=False cuando quien llama ya envía su propio resumen por el bot admin (evita duplicados).
+    """
     contenido = (f"<p style='color:#dc2626;font-weight:bold'>{escape(asunto)}</p>"
                  f"<pre style='white-space:pre-wrap;background:#f3f4f6;padding:12px;border-radius:6px;font-size:13px'>{escape(detalle)}</pre>"
                  "<p>Revise la pestaña <strong>Monitoreo</strong> del panel y los logs de Railway.</p>")
@@ -294,7 +297,8 @@ def enviar_alerta_sistema(asunto: str, detalle: str):
                       _plantilla("Alerta del sistema de monitoreo", "Aviso automático de salud", contenido))
     except Exception as e:
         print(f"[ALERTA SISTEMA] No se pudo enviar el correo de alerta: {e}")
-    notificar_admin(f"⚠️ <b>Sistema ANM: {escape(asunto)}</b>\n{escape(detalle[:1500])}")
+    if telegram:
+        notificar_admin(f"⚠️ <b>Sistema ANM: {escape(asunto)}</b>\n{escape(detalle[:1500])}")
 
 
 # Alias de compatibilidad
