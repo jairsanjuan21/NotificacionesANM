@@ -3,17 +3,18 @@ import { Inbox, CalendarClock, Mountain, Gauge, LogOut } from 'lucide-react';
 import { useDatos } from '../contexto/datos';
 import Contornos from '../componentes/ui/Contornos';
 import SelectorTema from '../componentes/ui/SelectorTema';
-import { requiereAtencion, iniciales, respondida } from '../utilidades';
+import { sinRevisar, iniciales, respondida } from '../utilidades';
 
 export default function Marco({ sesion, onSalir }) {
   const { enPeriodo } = useDatos();
-  const atencion = enPeriodo.filter(requiereAtencion).length;
+  // El contador de la Bandeja es lo "no leído", igual que el encabezado de la página
+  const porRevisar = enPeriodo.filter(sinRevisar).length;
   const porVencer = enPeriodo.filter(n => !respondida(n) && n.dias_habiles_restantes !== null
     && n.dias_habiles_restantes >= 0 && n.dias_habiles_restantes <= 5).length;
   const esAdmin = sesion.rol === 'admin';
 
   const enlaces = [
-    { a: '/', fin: true, Icono: Inbox, texto: 'Bandeja', cuenta: atencion },
+    { a: '/', fin: true, Icono: Inbox, texto: 'Bandeja', cuenta: porRevisar, tono: 'informativo' },
     { a: '/agenda', Icono: CalendarClock, texto: 'Vencimientos', cuenta: porVencer },
     { a: '/titulos', Icono: Mountain, texto: 'Títulos mineros' },
   ];
@@ -33,10 +34,10 @@ export default function Marco({ sesion, onSalir }) {
         </NavLink>
 
         <nav className="navegacion" aria-label="Principal">
-          {enlaces.map(({ a, fin, Icono, texto, cuenta }) => (
+          {enlaces.map(({ a, fin, Icono, texto, cuenta, tono }) => (
             <NavLink key={a} to={a} end={fin} className="nav-enlace">
               <Icono size={18} /> {texto}
-              {cuenta > 0 && <span className="contador" aria-label={`${cuenta} pendientes`}>{cuenta}</span>}
+              {cuenta > 0 && <span className={`contador ${tono || ''}`} aria-label={`${cuenta} pendientes`}>{cuenta}</span>}
             </NavLink>
           ))}
           {esAdmin && (
@@ -75,10 +76,10 @@ export default function Marco({ sesion, onSalir }) {
       </main>
 
       <nav className="nav-movil" aria-label="Principal">
-        {enlaces.map(({ a, fin, Icono, texto, cuenta }) => (
+        {enlaces.map(({ a, fin, Icono, texto, cuenta, tono }) => (
           <NavLink key={a} to={a} end={fin}>
             <Icono size={20} /> {texto.split(' ')[0]}
-            {cuenta > 0 && <span className="contador">{cuenta}</span>}
+            {cuenta > 0 && <span className={`contador ${tono || ''}`}>{cuenta}</span>}
           </NavLink>
         ))}
         {esAdmin && <NavLink to="/admin"><Gauge size={20} /> Sistema</NavLink>}

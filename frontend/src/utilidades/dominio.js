@@ -3,6 +3,8 @@
  * de las notificaciones de la ANM.
  */
 
+import { aFecha } from './fechas';
+
 export const URGENCIAS = {
   alta: { etiqueta: 'Urgente', clase: 'u-alta', orden: 0 },
   revisar: { etiqueta: 'Revisar a mano', clase: 'u-revisar', orden: 1 },
@@ -29,6 +31,9 @@ export const etiquetaRegional = (id) => (id === 'all' ? 'Todas' : REGIONALES.fin
 export const listaRegionales = (texto) => (texto || '').split(',').map(r => r.trim().toLowerCase()).filter(Boolean);
 
 export const respondida = (n) => n.estado === 'respondida';
+
+/** Aún nadie la ha abierto ni gestionado: es lo "no leído" de la bandeja. */
+export const sinRevisar = (n) => (n.estado || 'nueva') === 'nueva';
 
 /** Clasifica qué tan cerca está el vencimiento (para colores y textos). */
 export function nivelPlazo(n) {
@@ -82,4 +87,53 @@ export function tituloActo(n) {
   if (n.fuente === 'coactivo') return n.numero ? `Cobro coactivo, aviso ${n.numero}` : 'Aviso de cobro coactivo';
   if (n.tipo_acto && n.numero) return `${n.tipo_acto} ${n.numero}`;
   return nombreDocumento(n.url_pdf);
+}
+
+/**
+ * Orden de los tipos de acto dentro de un mismo día.
+ * El ingeniero revisa primero los autos (suelen traer requerimientos con plazo),
+ * luego las resoluciones y al final avisos y demás.
+ */
+const ORDEN_TIPO = { Auto: 0, 'Resolución': 1 };
+export const ordenTipoActo = (n) => ORDEN_TIPO[n.tipo_acto] ?? 2;
+
+/**
+ * Orden "como publica la ANM": día de publicación más reciente primero;
+ * dentro del día, autos antes que resoluciones; y luego por prioridad.
+ */
+export function compararPorPublicacion(a, b) {
+  const fa = aFecha(a.fecha_aviso)?.getTime() ?? 0;
+  const fb = aFecha(b.fecha_aviso)?.getTime() ?? 0;
+  return fb - fa || ordenTipoActo(a) - ordenTipoActo(b) || prioridad(a) - prioridad(b) || b.id_notificacion - a.id_notificacion;
+}
+
+/**
+ * Agrupa una lista YA ORDENADA en bloques consecutivos con la misma clave.
+ * Recorre una sola vez (O(n)) y conserva el orden: por eso sirve para
+ * pintar encabezados por día sin volver a ordenar.
+ *   agruparConsecutivos([a, b, c], n => n.fecha_aviso) → [{ clave, items: [a, b] }, { clave, items: [c] }]
+ */
+export function agruparConsecutivos(lista, claveDe) {
+  const grupos = [];
+  for (const item of lista) {
+    const clave = claveDe(item);
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.clave === clave) ultimo.items.push(item);
+    else grupos.push({ clave, items: [item] });
+  }
+  return grupos;
+}
+
+/** "2 autos, 1 resolución y 1 aviso": composición de un día en palabras. */
+export function resumenTipos(lista) {
+  const cuenta = {};
+  lista.forEach(n => {
+    const t = n.fuente === 'coactivo' ? 'cobro coactivo' : (n.tipo_acto || 'otro documento').toLowerCase();
+    cuenta[t] = (cuenta[t] || 0) + 1;
+  });
+  const plural = { auto: 'autos', 'resolución': 'resoluciones', aviso: 'avisos', 'otro documento': 'otros documentos', 'cobro coactivo': 'cobros coactivos' };
+  const partes = Object.entries(cuenta)
+    .sort(([a], [b]) => ordenTipoActo({ tipo_acto: a[0].toUpperCase() + a.slice(1) }) - ordenTipoActo({ tipo_acto: b[0].toUpperCase() + b.slice(1) }))
+    .map(([t, n]) => `${n} ${n === 1 ? t : plural[t] || t}`);
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0] || '';
 }

@@ -69,6 +69,7 @@
   line-height: 20px;
 }
 
+.contador.informativo { background: var(--acento-pizarra); color: var(--pizarra); }  /* sin revisar: no es alarma */
 .lateral-pie { margin-top: auto; padding: 14px 16px 18px; border-top: 1px solid rgb(255 255 255 / .07); }
 .lateral-tema {
   display: flex; align-items: center; justify-content: space-between;
