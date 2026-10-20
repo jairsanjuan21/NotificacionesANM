@@ -36,11 +36,17 @@ def _directorio_logs() -> str:
     return d
 
 
+# Palabras completas (\b): "AVISO" no debe coincidir con "Avisos" (la fuente de la ANM que se
+# consulta en cada barrido), ni "ERROR" con "Resumen de errores" o "consultas_con_error".
+_PATRON_ERROR = re.compile(r"\b(ERROR|CRITICAL|TRACEBACK|EXCEPTION|FALLO|FALLÓ|FALLIDA|FALLIDO)\b")
+_PATRON_AVISO = re.compile(r"\[!\]|⚠|\b(WARN|WARNING|AVISO|ALERTA)\b")
+
+
 def _nivel_de(texto: str) -> str:
     t = texto.upper()
-    if any(x in t for x in ("ERROR", "CRITICAL", "TRACEBACK", "EXCEPTION", "FALLO", "FALLIDA")):
+    if _PATRON_ERROR.search(t):
         return "error"
-    if any(x in t for x in ("[!]", "WARN", "AVISO", "ALERTA", "⚠")):
+    if _PATRON_AVISO.search(t):
         return "aviso"
     return "info"
 

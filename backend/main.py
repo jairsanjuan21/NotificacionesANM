@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from database import models, database
 from database.migraciones import migrar
@@ -24,6 +25,7 @@ from servicios import auth
 from scraper.anm_scraper import ejecutar_scraper, cerrar_barridos_huerfanos
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
 from servicios.telegram_bot import configurar_webhooks
+from servicios import bot_admin, contexto_app
 
 # Crear tablas y agregar columnas nuevas sin perder datos
 migrar()
@@ -33,6 +35,7 @@ ZONA_HORARIA_CO = pytz.timezone("America/Bogota")
 
 # Instanciar el programador en segundo plano
 scheduler = BackgroundScheduler(timezone=ZONA_HORARIA_CO)
+contexto_app.scheduler = scheduler  # para que el bot admin pueda consultar las tareas
 
 
 def tarea_programada_scraper():
@@ -121,11 +124,23 @@ async def lifespan(app: FastAPI):
                       id="vigilante", name="Vigilante de salud del sistema (9:10 AM)",
                       replace_existing=True, max_instances=1, coalesce=True)
 
+    # 5. Resumen de errores del log por el bot admin: cada 15 minutos, solo si hay errores nuevos
+    bot_admin.iniciar_resumen_errores()
+    scheduler.add_job(bot_admin.resumen_errores, IntervalTrigger(minutes=15, timezone=ZONA_HORARIA_CO),
+                      id="resumen_errores", name="Resumen de errores por Telegram (cada 15 min)",
+                      replace_existing=True, max_instances=1, coalesce=True)
+
     scheduler.start()
 
-    # 5. Bots de Telegram: registrar webhooks y menú de comandos (no bloquea el arranque si falla)
+    # 6. Bots de Telegram: registrar webhooks y avisar el arranque (en un hilo: no bloquea si Telegram falla)
+    def _arrancar_telegram():
+        try:
+            bot_admin.aviso_arranque(huerfanos, configurar_webhooks())
+        except Exception as e:
+            print(f"[TELEGRAM] Error al arrancar los bots: {e}")
+
     import threading
-    threading.Thread(target=configurar_webhooks, daemon=True, name="telegram-webhooks").start()
+    threading.Thread(target=_arrancar_telegram, daemon=True, name="telegram-arranque").start()
     print("\n=======================================================")
     print(" [SCHEDULER ACTIVO] Zona Horaria: America/Bogota")
     for job in scheduler.get_jobs():

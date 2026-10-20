@@ -166,6 +166,7 @@ def procesar_update(canal: str, update: dict):
             enviar_mensaje(canal, "🔒 Este bot es privado.\n"
                                   f"Tu ID es <code>{chat_id}</code>. Compártelo con el administrador "
                                   "si necesitas acceso.", chat_id=chat_id)
+            print(f"[BOT:{canal}] Acceso denegado al chat {chat_id}")
             _avisar_intruso(canal, chat_id, usuario, texto)
             return
 
@@ -300,4 +301,4 @@ def estado_webhooks() -> dict:
 
 # ============================================================================ carga de los comandos de cada bot
 # Va al final a propósito: esos módulos importan los decoradores definidos arriba.
-from servicios import bot_cliente  # noqa: E402,F401
+from servicios import bot_admin, bot_cliente  # noqa: E402,F401
