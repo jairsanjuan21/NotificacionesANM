@@ -56,3 +56,17 @@ export function haceCuanto(iso) {
   const dias = Math.round(s / 86400);
   return dias === 1 ? 'ayer' : `hace ${dias} días`;
 }
+
+/** "Hoy", "Ayer" o "lunes 19 de octubre" (con año si no es el actual). Para encabezados por día. */
+export function etiquetaDia(texto, hoy = new Date()) {
+  const d = aFecha(texto);
+  if (!d) return 'Sin fecha de publicación';
+  const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const dias = Math.round((inicioHoy - d) / 864e5);
+  if (dias === 0) return 'Hoy';
+  if (dias === 1) return 'Ayer';
+  const opciones = { weekday: 'long', day: 'numeric', month: 'long' };
+  if (d.getFullYear() !== hoy.getFullYear()) opciones.year = 'numeric';
+  const t = d.toLocaleDateString('es-CO', opciones).replace(',', '');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import api from '../servicios/api';
 import useConsulta from '../hooks/useConsulta';
 import usePreferencia from '../hooks/usePreferencia';
@@ -16,7 +16,6 @@ export default function ProveedorDatos({ children }) {
   const { datos = VACIO, error, cargando, recargar, fijarDatos } = useConsulta('datos', consultarTodo);
   const { clientes, notificaciones } = datos;
   const [fechaDesde, setFechaDesde] = usePreferencia('fechaDesde', FECHA_DESDE_POR_DEFECTO);
-  const [barriendo, setBarriendo] = useState(false);
 
   // Reemplaza una notificación en memoria tras editarla (evita recargar todo)
   const actualizarNotificacion = useCallback((nueva) => {
@@ -37,9 +36,8 @@ export default function ProveedorDatos({ children }) {
       error, recargar,
       clientePorId: (id) => porId.get(id),
       fechaDesde, setFechaDesde, actualizarNotificacion,
-      barriendo, setBarriendo,
     };
-  }, [clientes, notificaciones, datos, cargando, error, recargar, fechaDesde, setFechaDesde, actualizarNotificacion, barriendo]);
+  }, [clientes, notificaciones, datos, cargando, error, recargar, fechaDesde, setFechaDesde, actualizarNotificacion]);
 
   return <ContextoDatos.Provider value={valor}>{children}</ContextoDatos.Provider>;
 }

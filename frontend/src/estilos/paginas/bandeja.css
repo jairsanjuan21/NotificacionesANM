@@ -2,8 +2,8 @@
 
 .resumen-dia { margin-bottom: 18px; }
 .resumen-dia .frase { font-size: var(--texto-3xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
-.resumen-dia .frase .cifra { font-variant-numeric: tabular-nums; color: var(--oxido); }
-.resumen-dia .frase.tranquila .cifra { color: var(--malaquita); }
+.resumen-dia .frase .cifra { font-variant-numeric: tabular-nums; color: var(--verdin); }
+.resumen-dia .frase .tranquila { color: var(--malaquita); }
 .resumen-dia .detalle { margin-top: 8px; color: var(--tinta-2); font-size: var(--texto-base); }
 .resumen-dia .detalle button { padding: 0; border: 0; background: none; color: var(--verdin); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 
@@ -21,7 +21,9 @@
   background: var(--superficie);
   border: 1px solid var(--linea);
   border-radius: var(--radio-l);
-  overflow: hidden;
+  /* clip (no hidden): recorta las esquinas sin crear un contenedor de scroll,
+     así los encabezados de día pueden quedarse pegados con position: sticky */
+  overflow: clip;
 }
 .lista-cabecera, .fila {
   display: grid;
@@ -31,6 +33,10 @@
 }
 .bandeja.con-detalle .lista-cabecera,
 .bandeja.con-detalle .fila { grid-template-columns: 4px minmax(120px, 1fr) minmax(160px, 2fr) 120px; }
+.lista.por-dia .lista-cabecera,
+.lista.por-dia .fila { grid-template-columns: 4px minmax(150px, 1.2fr) minmax(240px, 2.8fr) 132px 118px; }
+.bandeja.con-detalle .lista.por-dia .lista-cabecera,
+.bandeja.con-detalle .lista.por-dia .fila { grid-template-columns: 4px minmax(120px, 1fr) minmax(160px, 2fr) 120px; }
 .bandeja.con-detalle .col-publicado,
 .bandeja.con-detalle .col-estado { display: none; }
 
@@ -57,6 +63,32 @@
 .fila:hover { background: var(--superficie-2); }
 .fila[aria-selected="true"] { background: var(--verdin-suave); }
 .fila.respondida { color: var(--tinta-3); }
+
+/* Sin revisar: punto de verdín y título con más peso, como un correo sin leer */
+.punto-nueva {
+  display: inline-block; width: 7px; height: 7px; margin-right: 6px; vertical-align: 2px;
+  border-radius: 50%; background: var(--verdin);
+}
+.celda-acto .acto { font-weight: 500; }
+.fila.nueva .celda-acto .acto { font-weight: 650; }
+.tipo-acto { color: var(--tinta-3); font-weight: 500; }
+.fila.nueva .tipo-acto { color: var(--tinta-2); }
+
+/* Encabezado de cada día de publicación: un estrato en la columna de la roca */
+.cabecera-dia {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: baseline; gap: var(--espacio-3); flex-wrap: wrap;
+  padding: var(--espacio-3) var(--espacio-4) var(--espacio-2) 18px;
+  background: color-mix(in srgb, var(--superficie-2) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--linea-suave);
+  border-top: 1px solid var(--linea);
+}
+.grupo-dia:first-child .cabecera-dia { border-top: 0; }
+.cabecera-dia h2 { font-size: var(--texto-l); font-weight: 700; font-stretch: var(--ancho-amplio); letter-spacing: -0.01em; }
+.cabecera-dia .composicion { font-size: var(--texto-s); color: var(--tinta-3); }
+.cabecera-dia .urgentes-dia { margin-left: auto; font-size: var(--texto-s); font-weight: 650; color: var(--oxido); }
+
 .fila.respondida .placa { color: var(--tinta-2); }
 
 .veta { align-self: stretch; border-radius: 0 3px 3px 0; margin: -12px 0; }
@@ -70,7 +102,7 @@
 .celda-titulo .titular { font-size: var(--texto-xs); color: var(--tinta-3); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .celda-acto { min-width: 0; }
-.celda-acto .acto { font-weight: 600; overflow: hidden; font-size: var(--texto-m); display: flex; gap: 6px; align-items: center; min-width: 0; }
+.celda-acto .acto { overflow: hidden; font-size: var(--texto-m); display: flex; gap: 6px; align-items: center; min-width: 0; }
 .celda-acto .acto span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .celda-acto .extracto { display: block; font-size: var(--texto-s); color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .fila.respondida .celda-acto .extracto { color: var(--tinta-3); }
@@ -93,7 +125,7 @@
 
 @media (max-width: 860px) {
   .lista-cabecera { display: none; }
-  .fila, .bandeja.con-detalle .fila {
+  .fila, .bandeja.con-detalle .fila, .lista.por-dia .fila {
     grid-template-columns: 4px minmax(0, 1fr) auto;
     grid-template-areas: "veta titulo plazo" "veta acto acto";
     row-gap: 6px;
@@ -104,4 +136,12 @@
   .fila .col-plazo { grid-area: plazo; text-align: right; }
   .fila .col-publicado, .fila .col-estado { display: none; }
   .resumen-dia .frase { font-size: var(--texto-2xl); }
+  /* Filtros en una sola hilera desplazable, como pestañas */
+  .herramientas .chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px 2px; scrollbar-width: none; }
+  .herramientas .chips .chip { flex-shrink: 0; }
+  .etiqueta-orden { display: none; }
+  .herramientas .segmentado { width: 100%; flex-wrap: nowrap; }
+  .herramientas .segmentado button { flex: 1; justify-content: center; }
+  .cabecera-dia { padding-left: var(--espacio-4); }
+  .celda-acto .extracto { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 }

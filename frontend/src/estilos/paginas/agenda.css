@@ -25,3 +25,11 @@
 .agenda-item .que .linea2 { font-size: var(--texto-s); color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acto-agenda { font-size: var(--texto-m); }
 .agenda-estado { display: flex; flex-direction: column; align-items: flex-end; gap: var(--espacio-1); }
+
+/* Celular: el estado baja debajo del texto para no apretar el título */
+@media (max-width: 860px) {
+  .agenda-item { grid-template-columns: 56px minmax(0, 1fr); gap: var(--espacio-1) var(--espacio-3); align-items: start; }
+  .agenda-item .dia-calendario { grid-row: span 2; }
+  .agenda-estado { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--espacio-2); }
+  .agenda-item .que .linea2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}

@@ -69,7 +69,28 @@
   line-height: 20px;
 }
 
+.contador.informativo { background: var(--acento-pizarra); color: var(--pizarra); }  /* sin revisar: no es alarma */
 .lateral-pie { margin-top: auto; padding: 14px 16px 18px; border-top: 1px solid rgb(255 255 255 / .07); }
+.indicador-barrido {
+  display: flex; align-items: flex-start; gap: var(--espacio-2);
+  margin-bottom: var(--espacio-3); padding: var(--espacio-2) var(--espacio-3);
+  border-radius: var(--radio-m);
+  background: color-mix(in srgb, var(--acento-pizarra) 12%, transparent);
+  font-size: var(--texto-xs); color: var(--pizarra-tinta);
+}
+.indicador-barrido strong { display: block; color: var(--blanco); font-weight: 600; }
+.indicador-barrido .cuando { color: var(--pizarra-tinta-2); }
+/* Pulso como un sonar: el único movimiento que no responde a un clic, porque señala trabajo en curso */
+.indicador-barrido .pulso {
+  position: relative; flex-shrink: 0; width: 8px; height: 8px; margin-top: 4px;
+  border-radius: 50%; background: var(--acento-pizarra);
+}
+.indicador-barrido .pulso::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid var(--acento-pizarra);
+  animation: sonar 1.6s var(--curva-salida) infinite;
+}
+@keyframes sonar { to { transform: scale(2.8); opacity: 0; } }
 .lateral-tema {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: var(--espacio-3);

@@ -6,6 +6,7 @@ Panel web para seguir las notificaciones que la Agencia Nacional de Minería pub
 npm install
 npm run dev      # http://localhost:5173 (espera el backend en http://127.0.0.1:8000)
 npm run lint     # debe quedar en cero
+npm test         # pruebas de la lógica (utilidades/__pruebas__)
 npm run build    # genera dist/, que el backend sirve en producción
 ```
 

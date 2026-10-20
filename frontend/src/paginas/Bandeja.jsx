@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 import api, { mensajeError } from '../servicios/api';
 import { useDatos } from '../contexto/datos';
 import { useAvisos, useConfirmar } from '../contexto/avisos';
-import { InsigniaEstado, Plazo } from '../componentes/Insignias';
+import FilaNotificacion from '../componentes/FilaNotificacion';
 import BarraSuperior from '../componentes/BarraSuperior';
 import FiltroFecha from '../componentes/FiltroFecha';
 import BotonConsultar from '../componentes/BotonConsultar';
@@ -14,25 +14,39 @@ import Boton from '../componentes/ui/Boton';
 import Cargando from '../componentes/ui/Cargando';
 import EstadoVacio from '../componentes/ui/EstadoVacio';
 import usePantallaAncha from '../hooks/usePantallaAncha';
+import usePreferencia from '../hooks/usePreferencia';
 import {
-  REGIONALES, URGENCIAS, listaRegionales, prioridad, requiereAtencion, respondida,
-  tiempoDe, fechaCorta, diaSemana, tituloActo, textoRestante,
+  REGIONALES, listaRegionales, prioridad, requiereAtencion, respondida, tiempoDe, fechaCorta, diaSemana,
+  compararPorPublicacion, agruparConsecutivos, etiquetaDia, resumenTipos, sinRevisar,
 } from '../utilidades';
 
+const SIN_CLIENTE = {};
+
+/** "hoy", "ayer" o "el jueves 15 de octubre", para usar dentro de una frase. */
+function cuandoFue(fecha) {
+  const e = etiquetaDia(fecha);
+  return e === 'Hoy' || e === 'Ayer' ? e.toLowerCase() : `el ${e.charAt(0).toLowerCase()}${e.slice(1)}`;
+}
+
 const FILTROS = [
-  { id: 'atencion', texto: 'Requieren atención', prueba: requiereAtencion },
   { id: 'sin_responder', texto: 'Sin responder', prueba: n => !respondida(n) },
-  { id: 'nuevas', texto: 'Nuevas', prueba: n => (n.estado || 'nueva') === 'nueva' },
+  { id: 'atencion', texto: 'Requieren atención', prueba: requiereAtencion },
+  { id: 'nuevas', texto: 'Sin revisar', prueba: sinRevisar },
   { id: 'en_tramite', texto: 'En trámite', prueba: n => n.estado === 'en_tramite' },
   { id: 'coactivo', texto: 'Cobro coactivo', prueba: n => n.fuente === 'coactivo' },
   { id: 'respondidas', texto: 'Respondidas', prueba: respondida },
   { id: 'todas', texto: 'Todas', prueba: () => true },
 ];
 
-const ORDENES = {
-  prioridad: { texto: 'Prioridad', fn: (a, b) => prioridad(a) - prioridad(b) || limite(a) - limite(b) || tiempoDe(b.fecha_aviso) - tiempoDe(a.fecha_aviso) },
-  recientes: { texto: 'Publicación más reciente', fn: (a, b) => tiempoDe(b.fecha_aviso) - tiempoDe(a.fecha_aviso) || b.id_notificacion - a.id_notificacion },
-  limite: { texto: 'Fecha límite más próxima', fn: (a, b) => limite(a) - limite(b) },
+/*
+ * Tres formas de leer la bandeja. "publicacion" es la predeterminada:
+ * el ingeniero revisa lo que la ANM publicó, día por día, como en el portal;
+ * la urgencia es una segunda capa (veta de color e insignia), no el orden.
+ */
+const VISTAS = {
+  publicacion: { texto: 'Publicación', fn: compararPorPublicacion, agrupar: true },
+  prioridad: { texto: 'Urgencia', fn: (a, b) => prioridad(a) - prioridad(b) || limite(a) - limite(b) || tiempoDe(b.fecha_aviso) - tiempoDe(a.fecha_aviso) },
+  limite: { texto: 'Vencimiento', fn: (a, b) => limite(a) - limite(b) || compararPorPublicacion(a, b) },
 };
 function limite(n) {
   if (!n.fecha_limite || respondida(n)) return Number.MAX_SAFE_INTEGER;
@@ -46,26 +60,36 @@ export default function Bandeja() {
   const avisos = useAvisos();
   const confirmar = useConfirmar();
   const [params, setParams] = useSearchParams();
-  const [filtro, setFiltro] = useState(params.get('filtro') || 'atencion');
+  const [filtro, setFiltro] = useState(params.get('filtro') || 'sin_responder');
   const [busqueda, setBusqueda] = useState('');
   const [regional, setRegional] = useState('');
-  const [orden, setOrden] = useState('prioridad');
+  const [orden, setOrden] = usePreferencia('vistaBandeja', 'publicacion');
+  const vista = VISTAS[orden] || VISTAS.publicacion;
   // Paginación que vuelve a la primera página cuando cambia cualquier filtro.
   // En vez de un useEffect que llame setMostrar(POR_PAGINA), guardamos junto al
   // número la "firma" de los filtros con que se calculó; si no coincide, se descarta.
   const firmaFiltros = [filtro, busqueda, regional, orden, fechaDesde].join('|');
-  const [pagina, setPagina] = useState({ firma: firmaFiltros, mostrar: POR_PAGINA });
-  const mostrar = pagina.firma === firmaFiltros ? pagina.mostrar : POR_PAGINA;
-  const setMostrar = (fn) => setPagina({ firma: firmaFiltros, mostrar: fn(mostrar) });
+  const [paginacion, setPaginacion] = useState({ firma: firmaFiltros, mostrar: POR_PAGINA });
+  const mostrar = paginacion.firma === firmaFiltros ? paginacion.mostrar : POR_PAGINA;
+  const setMostrar = (fn) => setPaginacion({ firma: firmaFiltros, mostrar: fn(mostrar) });
   const ancha = usePantallaAncha();
   const listaRef = useRef(null);
 
   const seleccion = params.get('n') ? Number(params.get('n')) : null;
-  const seleccionar = (id) => {
-    const p = new URLSearchParams(params);
-    if (id) p.set('n', id); else p.delete('n');
-    setParams(p, { replace: true });
-  };
+  // La notificación abierta vive en la URL (?n=123): se puede compartir, recargar o volver atrás.
+  // Se usa la forma funcional de setParams para que la función sea estable y FilaNotificacion
+  // (memorizada) no se vuelva a pintar entera en cada render.
+  const seleccionar = useCallback((id) => {
+    setParams((actual) => {
+      const p = new URLSearchParams(actual);
+      if (id) p.set('n', id); else p.delete('n');
+      return p;
+    }, { replace: true });
+  }, [setParams]);
+  const elegirFila = useCallback((id) => {
+    // En pantalla ancha, volver a pulsar la fila abierta la cierra
+    seleccionar(id === seleccion && ancha ? null : id);
+  }, [seleccionar, seleccion, ancha]);
 
   // Notificaciones filtradas y ordenadas
   const { visibles, cuentas } = useMemo(() => {
@@ -79,8 +103,8 @@ export default function Bandeja() {
     });
     const cuentas = Object.fromEntries(FILTROS.map(f => [f.id, base.filter(f.prueba).length]));
     const prueba = FILTROS.find(f => f.id === filtro)?.prueba || (() => true);
-    return { visibles: base.filter(prueba).sort(ORDENES[orden].fn), cuentas };
-  }, [enPeriodo, clientePorId, busqueda, regional, filtro, orden]);
+    return { visibles: base.filter(prueba).sort(vista.fn), cuentas };
+  }, [enPeriodo, clientePorId, busqueda, regional, filtro, vista]);
 
   const seleccionada = notificaciones.find(n => n.id_notificacion === seleccion) || null;
 
@@ -104,7 +128,19 @@ export default function Bandeja() {
   const proxima = enPeriodo
     .filter(n => !respondida(n) && n.dias_habiles_restantes !== null && n.dias_habiles_restantes >= 0)
     .sort((a, b) => limite(a) - limite(b))[0];
+  const porRevisar = enPeriodo.filter(sinRevisar).length;
+  const ultimaPublicacion = enPeriodo.reduce((max, n) => (tiempoDe(n.fecha_aviso) > tiempoDe(max) ? n.fecha_aviso : max), null);
   const ocultas = notificaciones.length - enPeriodo.length;
+
+  // En la vista por publicación se pintan encabezados por día; en las otras, un solo bloque sin título.
+  const pagina = visibles.slice(0, mostrar);
+  const grupos = vista.agrupar
+    ? agruparConsecutivos(pagina, n => n.fecha_aviso || '').map(g => ({
+      ...g,
+      titulo: etiquetaDia(g.clave),
+      urgentes: g.items.filter(n => !respondida(n) && n.urgencia === 'alta').length,
+    }))
+    : [{ clave: 'todas', items: pagina }];
   const antiguasSinResolver = fechaDesde
     ? notificaciones.filter(n => tiempoDe(n.fecha_aviso) < tiempoDe(fechaDesde) && !respondida(n)).length : 0;
 
@@ -144,19 +180,22 @@ export default function Bandeja() {
       </BarraSuperior>
 
       <section className="resumen-dia" aria-live="polite">
-        {atencion.length > 0 ? (
-          <p className="frase"><span className="cifra">{atencion.length}</span> {atencion.length === 1 ? 'notificación requiere' : 'notificaciones requieren'} atención</p>
-        ) : (
-          <p className="frase tranquila"><span className="cifra">Nada urgente</span> por ahora</p>
-        )}
-        {proxima && (
-          <p className="detalle">
-            El próximo vencimiento es el {diaSemana(proxima.fecha_limite)}:{' '}
-            <button onClick={() => seleccionar(proxima.id_notificacion)}>
-              {clientePorId(proxima.id_cliente)?.placa}, {tituloActo(proxima)}
-            </button>{' '}({textoRestante(proxima).toLowerCase()}).
-          </p>
-        )}
+        <p className="frase">
+          {porRevisar > 0
+            ? <><span className="cifra">{porRevisar}</span> {porRevisar === 1 ? 'notificación sin revisar' : 'notificaciones sin revisar'}</>
+            : <span className="tranquila">Todo revisado</span>}
+        </p>
+        <p className="detalle">
+          {ultimaPublicacion && <>La ANM publicó por última vez {cuandoFue(ultimaPublicacion)}. </>}
+          {atencion.length > 0 && (
+            <>
+              <button onClick={() => setFiltro('atencion')}>
+                {atencion.length} {atencion.length === 1 ? 'requiere' : 'requieren'} atención
+              </button>
+              {proxima && <> y el próximo vencimiento es el {diaSemana(proxima.fecha_limite)} (<button onClick={() => seleccionar(proxima.id_notificacion)}>{clientePorId(proxima.id_cliente)?.placa}</button>).</>}
+            </>
+          )}
+        </p>
       </section>
 
       <div className="herramientas">
@@ -178,72 +217,61 @@ export default function Bandeja() {
           <option value="">Todas las regionales</option>
           {REGIONALES.map(r => <option key={r.id} value={r.id}>{r.etiqueta}</option>)}
         </select>
-        <span className="separador" />
-        <label className="pequeno tenue hilera hueco-1" htmlFor="orden">
-          <ArrowUpDown size={15} /> Ordenar
-        </label>
-        <select id="orden" className="campo" value={orden} onChange={(e) => setOrden(e.target.value)}>
-          {Object.entries(ORDENES).map(([id, o]) => <option key={id} value={id}>{o.texto}</option>)}
-        </select>
+        <span className="estirar" />
+        <span className="pequeno tenue etiqueta-orden">Ordenar por</span>
+        <div className="segmentado" role="group" aria-label="Ordenar por">
+          {Object.entries(VISTAS).map(([id, v]) => (
+            <button key={id} aria-pressed={orden === id} onClick={() => setOrden(id)}>{v.texto}</button>
+          ))}
+        </div>
       </div>
 
       <div className={`bandeja ${conDetalle ? 'con-detalle' : ''}`}>
-        <div className="lista" ref={listaRef}>
+        <div className={`lista ${vista.agrupar ? 'por-dia' : ''}`} ref={listaRef}>
           <div className="lista-cabecera" aria-hidden="true">
             <span />
             <span>Título minero</span>
             <span>Acto</span>
-            <span className="col-publicado">Publicado</span>
+            {!vista.agrupar && <span className="col-publicado">Publicado</span>}
             <span className="col-plazo">Fecha límite</span>
             <span className="col-estado">Gestión</span>
           </div>
 
           {visibles.length === 0 ? (
             <EstadoVacio
-              titulo={filtro === 'atencion' ? 'No hay nada que requiera atención' : 'Ninguna notificación coincide'}
+              titulo={filtro === 'sin_responder' ? 'No hay notificaciones pendientes' : filtro === 'atencion' ? 'No hay nada que requiera atención' : 'Ninguna notificación coincide'}
               accion={filtro !== 'todas' && (
                 <Boton variante="secundario" onClick={() => { setFiltro('todas'); setBusqueda(''); setRegional(''); }}>Ver todas</Boton>
               )}>
-              {filtro === 'atencion'
-                ? 'Las notificaciones urgentes y las que vencen en los próximos 5 días hábiles aparecerán aquí.'
-                : 'Pruebe con otro filtro o borre la búsqueda.'}
+              {filtro === 'sin_responder'
+                ? 'Todo lo publicado por la ANM en este período ya está respondido.'
+                : filtro === 'atencion'
+                  ? 'Las notificaciones urgentes y las que vencen en los próximos 5 días hábiles aparecerán aquí.'
+                  : 'Pruebe con otro filtro o borre la búsqueda.'}
             </EstadoVacio>
           ) : (
             <div role="listbox" aria-label="Notificaciones">
-              {visibles.slice(0, mostrar).map(n => {
-                const c = clientePorId(n.id_cliente) || {};
-                const u = URGENCIAS[n.urgencia];
-                return (
-                  <button
-                    key={n.id_notificacion}
-                    data-id={n.id_notificacion}
-                    role="option"
-                    aria-selected={n.id_notificacion === seleccion}
-                    className={`fila ${respondida(n) ? 'respondida' : ''}`}
-                    onClick={() => seleccionar(n.id_notificacion === seleccion && ancha ? null : n.id_notificacion)}
-                  >
-                    <span className={`veta ${!respondida(n) && u ? u.clase : 'u-ninguna'}`} />
-                    <span className="celda-titulo">
-                      <span className="placa">{c.placa}</span>
-                      <span className="titular">{c.nombre_empresa}</span>
-                    </span>
-                    <span className="celda-acto">
-                      <span className="acto">
-                        <span>{tituloActo(n)}</span>
-                        {!respondida(n) && u && n.urgencia !== 'baja' && n.urgencia !== 'media' && (
-                          <span className={`insignia mini ${u.clase}`}>{u.etiqueta}</span>
-                        )}
-                      </span>
-                      <span className="extracto">
-                        {n.resumen || (n.tipo_notificacion ? `${n.tipo_notificacion}${n.motivo_urgencia && n.urgencia !== 'baja' ? `, menciona ${n.motivo_urgencia}` : ''}` : 'Documento sin analizar')}
-                      </span>
-                    </span>
-                    <span className="col-publicado num pequeno secundario-texto">{fechaCorta(n.fecha_aviso)}</span>
-                    <span className="col-plazo"><Plazo notif={n} /></span>
-                    <span className="col-estado"><InsigniaEstado estado={n.estado} /></span>
-                  </button>
-                );
-              })}
+              {grupos.map(g => (
+                <section key={g.clave} className="grupo-dia" aria-label={g.titulo || undefined}>
+                  {g.titulo && (
+                    <header className="cabecera-dia">
+                      <h2>{g.titulo}</h2>
+                      <span className="composicion">{resumenTipos(g.items)}</span>
+                      {g.urgentes > 0 && <span className="urgentes-dia">{g.urgentes} {g.urgentes === 1 ? 'urgente' : 'urgentes'}</span>}
+                    </header>
+                  )}
+                  {g.items.map(n => (
+                    <FilaNotificacion
+                      key={n.id_notificacion}
+                      notif={n}
+                      cliente={clientePorId(n.id_cliente) || SIN_CLIENTE}
+                      seleccionada={n.id_notificacion === seleccion}
+                      mostrarPublicado={!vista.agrupar}
+                      onElegir={elegirFila}
+                    />
+                  ))}
+                </section>
+              ))}
             </div>
           )}
 
@@ -254,10 +282,10 @@ export default function Bandeja() {
             </span>
             <span className="hilera">
               {antiguasSinResolver > 0 && (
-                <button className="boton fantasma pequeno" onClick={marcarAntiguas}>Marcar {antiguasSinResolver} anteriores como respondidas</button>
+                <Boton variante="fantasma" tamano="pequeno" onClick={marcarAntiguas}>Marcar {antiguasSinResolver} anteriores como respondidas</Boton>
               )}
               {visibles.length > mostrar && (
-                <button className="boton secundario pequeno" onClick={() => setMostrar(m => m + POR_PAGINA)}>Mostrar más</button>
+                <Boton variante="secundario" tamano="pequeno" onClick={() => setMostrar(m => m + POR_PAGINA)}>Mostrar más</Boton>
               )}
             </span>
           </div>
