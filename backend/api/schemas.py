@@ -75,6 +75,7 @@ class EjecucionResponse(BaseModel):
     inicio: Optional[datetime] = None
     fin: Optional[datetime] = None
     origen: Optional[str] = None
+    id_cliente: Optional[int] = None
     estado: Optional[str] = None
     placas_consultadas: Optional[int] = 0
     consultas_ok: Optional[int] = 0

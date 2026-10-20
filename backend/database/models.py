@@ -82,6 +82,7 @@ class Ejecucion(Base):
     inicio = Column(DateTime, default=datetime.utcnow)
     fin = Column(DateTime, nullable=True)
     origen = Column(String, default="automatico")         # automatico | manual
+    id_cliente = Column(Integer, nullable=True)           # Si el barrido fue de una sola placa
     estado = Column(String, default="en_curso")           # en_curso | ok | con_alertas | fallida
     placas_consultadas = Column(Integer, default=0)
     consultas_ok = Column(Integer, default=0)
