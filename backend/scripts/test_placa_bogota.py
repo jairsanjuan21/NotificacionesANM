@@ -1,8 +1,8 @@
 import os
 import sys
 
-# 1. Configurar sys.path en la raíz de 'backend'
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Agregar la raíz de 'backend' al path para poder importar database, servicios, etc.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 2. Librerías externas
 import requests
