@@ -19,10 +19,11 @@ from apscheduler.triggers.cron import CronTrigger
 
 from database import models, database
 from database.migraciones import migrar
-from api import routes, auth_routes, admin_routes
+from api import routes, auth_routes, admin_routes, telegram_routes
 from servicios import auth
 from scraper.anm_scraper import ejecutar_scraper, cerrar_barridos_huerfanos
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
+from servicios.telegram_bot import configurar_webhooks
 
 # Crear tablas y agregar columnas nuevas sin perder datos
 migrar()
@@ -121,6 +122,10 @@ async def lifespan(app: FastAPI):
                       replace_existing=True, max_instances=1, coalesce=True)
 
     scheduler.start()
+
+    # 5. Bots de Telegram: registrar webhooks y menú de comandos (no bloquea el arranque si falla)
+    import threading
+    threading.Thread(target=configurar_webhooks, daemon=True, name="telegram-webhooks").start()
     print("\n=======================================================")
     print(" [SCHEDULER ACTIVO] Zona Horaria: America/Bogota")
     for job in scheduler.get_jobs():
@@ -175,6 +180,7 @@ async def control_de_acceso(request: Request, call_next):
 app.include_router(auth_routes.router, prefix="/api")
 app.include_router(admin_routes.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
+app.include_router(telegram_routes.router, prefix="/api")
 
 @app.get("/api/scheduler/estado")
 def obtener_estado_scheduler():

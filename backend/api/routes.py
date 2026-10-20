@@ -16,7 +16,7 @@ from scraper.anm_scraper import (BarridoEnCurso, barrido_en_curso, iniciar_barri
                                  procesar_historico,
                                  REGIONALES_ANM, URL_BASE, URL_COACTIVO, descubrir_formulario)
 from servicios.analizador import normalizar
-from servicios.telegram import enviar_telegram, telegram_configurado
+from servicios.telegram import canal_configurado, enviar_mensaje, estado_canales, telegram_configurado
 from servicios import plazos
 
 router = APIRouter()
@@ -378,6 +378,7 @@ def diagnostico_correo(db: Session = Depends(database.get_db)):
         "EMAIL_RECEIVER": bool(os.getenv("EMAIL_RECEIVER")),
         "EMAIL_PASSWORD": bool(os.getenv("EMAIL_PASSWORD")),
         "telegram": telegram_configurado(),
+        "telegram_canales": estado_canales(),
         "usuario_panel": bool(os.getenv("PANEL_USER") and os.getenv("PANEL_PASSWORD")),
         "resumen_ia_gemini": bool(os.getenv("GEMINI_API_KEY")),
         "base_de_datos": "postgres" if os.getenv("DATABASE_URL") else ("volume" if os.getenv("DB_PATH") else "repositorio (se reinicia en cada deploy)"),
@@ -395,10 +396,14 @@ def probar_alertas():
         resultado["correo"] = "enviado"
     except Exception as e:
         resultado["correo"] = f"error: {e}"
-    if telegram_configurado():
-        resultado["telegram"] = "enviado" if enviar_telegram("✅ Prueba del sistema de monitoreo ANM") else "error (ver logs)"
-    else:
-        resultado["telegram"] = "no configurado"
+    estados = []
+    for canal, texto in (("cliente", "✅ Prueba: este es el bot de notificaciones ANM."),
+                         ("admin", "🛠️ Prueba: este es el bot de administración del sistema ANM.")):
+        if not canal_configurado(canal):
+            estados.append(f"{canal} no configurado")
+        else:
+            estados.append(f"{canal} {'enviado' if enviar_mensaje(canal, texto) else 'con error (ver logs)'}")
+    resultado["telegram"] = ", ".join(estados)
     return resultado
 
 
