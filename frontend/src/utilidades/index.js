@@ -8,3 +8,4 @@ export * from './formato';
 export * from './dominio';
 export * from './logs';
 export * from './diagnostico';
+export * from './topografia';

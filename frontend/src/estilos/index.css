@@ -14,9 +14,11 @@
 @import './tablas.css';
 @import './modal.css';
 @import './avisos.css';
+@import './ui.css';
 
 /* Específico de cada página */
 @import './paginas/bandeja.css';
 @import './paginas/agenda.css';
 @import './paginas/login.css';
 @import './paginas/admin.css';
+@import './paginas/diseno.css';

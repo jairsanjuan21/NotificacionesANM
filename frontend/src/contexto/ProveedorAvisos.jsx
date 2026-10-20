@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
-import Modal from '../componentes/Modal';
+import Modal from '../componentes/ui/Modal';
 import { ContextoAvisos, ContextoConfirmar } from './avisos';
 
 let contador = 0;
@@ -50,7 +50,7 @@ export default function ProveedorAvisos({ children }) {
             {avisos.map(a => (
               <div key={a.id} className={`aviso ${a.tipo}`}>
                 {a.tipo === 'error' ? <AlertCircle size={18} /> : a.tipo === 'info' ? <Info size={18} /> : <CheckCircle2 size={18} />}
-                <span style={{ whiteSpace: 'pre-line' }}>{a.texto}</span>
+                <span className="aviso-texto">{a.texto}</span>
                 <button className="boton-icono" onClick={() => quitar(a.id)} aria-label="Cerrar aviso"><X size={15} /></button>
               </div>
             ))}

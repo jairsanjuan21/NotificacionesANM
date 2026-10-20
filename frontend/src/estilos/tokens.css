@@ -7,6 +7,9 @@
    light-dark(claro, oscuro). El navegador elige según `color-scheme`:
      - por defecto sigue al sistema operativo (light dark)
      - <html data-theme="light|dark"> fuerza uno de los dos
+
+   Los colores "noche" son siempre oscuros: la consola y los avisos flotantes
+   se leen como pantallas de instrumento sobre cualquier fondo.
    ===================================================================== */
 
 :root {
@@ -50,14 +53,59 @@
   --grafico-1: light-dark(#008F7E, #22A08F);
   --grafico-alerta: light-dark(#B4412F, #D45C46);
 
-  /* Radios: pequeño (insignias), medio (controles), grande (paneles) */
+  /* Superficies oscuras fijas (consola, toasts, globos): oscuras en ambos modos */
+  --noche: #12181B;
+  --noche-tinta: #CFD8D7;
+  --noche-tinta-2: #6F8286;
+  --noche-oxido: #F09A86;
+  --noche-ocre: #E8C27A;
+  --noche-verdin: #7FD0C4;
+  --blanco: #FFFFFF;
+  --velo: rgb(16 22 26 / .5);
+
+  /* Radios: pequeño (insignias), medio (controles), grande (paneles), redondo (píldoras) */
   --radio-s: 4px;
   --radio-m: 8px;
   --radio-l: 14px;
+  --radio-pildora: 999px;
+
+  /* Espaciado: múltiplos de 4 px. Usar estos valores, no números sueltos */
+  --espacio-1: 4px;
+  --espacio-2: 8px;
+  --espacio-3: 12px;
+  --espacio-4: 16px;
+  --espacio-5: 20px;
+  --espacio-6: 24px;
+  --espacio-8: 32px;
+  --espacio-12: 48px;
 
   /* Tipografía */
   --fuente: 'Archivo Variable', 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Escala tipográfica: base 15 px; los pasos crecen ~1.13–1.25 hacia arriba.
+     Diez tamaños en total: si un diseño pide otro, se ajusta el diseño. */
+  --texto-mini: 11px;   /* contadores, marcas diminutas */
+  --texto-xs: 12px;     /* metadatos, ayudas */
+  --texto-s: 13px;      /* texto secundario, chips */
+  --texto-m: 14px;      /* controles, tablas */
+  --texto-base: 15px;   /* lectura */
+  --texto-l: 17px;      /* placas en listas, subtítulos */
+  --texto-xl: 20px;     /* títulos de sección */
+  --texto-2xl: 24px;    /* cifras */
+  --texto-3xl: 30px;    /* títulos de página, placa en detalle */
+  --texto-4xl: clamp(30px, 4vw, 44px);  /* lema del inicio de sesión */
+
+  /* Archivo es variable en ancho: el ancho también comunica */
+  --ancho-condensado: 72%;  /* placas y códigos: como el rótulo de una estaca */
+  --ancho-estrecho: 86%;    /* marca y titulares compactos */
+  --ancho-amplio: 112%;     /* titulares de página: el horizonte */
+
+  /* Movimiento: solo para responder a una acción o señalar un cambio */
+  --duracion-rapida: 120ms;
+  --duracion: 200ms;
+  --duracion-lenta: 1600ms;
+  --curva-salida: cubic-bezier(.2, .7, .2, 1);
 
   /* Profundidad (una sombra no es un color: light-dark() no aplica, ver abajo) */
   --sombra-panel: 0 1px 2px rgba(31, 42, 48, .06), 0 8px 24px rgba(31, 42, 48, .07);

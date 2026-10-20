@@ -1,7 +1,9 @@
 import { Fragment, useState } from 'react';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import api, { mensajeError } from '../../servicios/api';
 import useConsulta from '../../hooks/useConsulta';
+import Cargando from '../../componentes/ui/Cargando';
+import EstadoVacio from '../../componentes/ui/EstadoVacio';
 import { fechaHora } from '../../utilidades';
 
 const ESTADO = {
@@ -22,9 +24,15 @@ export default function Barridos() {
   const error = fallo && mensajeError(fallo);
   const [abierto, setAbierto] = useState(null);
 
-  if (error) return <div className="vacio"><h3>No se pudo cargar el historial</h3><p>{error}</p></div>;
-  if (!lista) return <div className="cargando"><Loader2 size={18} className="girando" /> Cargando barridos…</div>;
-  if (!lista.length) return <div className="vacio"><h3>Aún no hay barridos registrados</h3><p>El primero se registrará en la próxima ejecución programada o al consultar la ANM manualmente.</p></div>;
+  if (error) return <EstadoVacio tono="error" titulo="No se pudo cargar el historial">{error}</EstadoVacio>;
+  if (!lista) return <Cargando>Cargando barridos…</Cargando>;
+  if (!lista.length) {
+    return (
+      <EstadoVacio titulo="Aún no hay barridos registrados">
+        El primero se registrará en la próxima ejecución programada o al consultar la ANM manualmente.
+      </EstadoVacio>
+    );
+  }
 
   return (
     <div className="tabla-contenedor">
@@ -49,21 +57,21 @@ export default function Barridos() {
             return (
               <Fragment key={e.id_ejecucion}>
                 <tr className={expandir ? 'clicable' : ''} onClick={() => expandir && setAbierto(abierto === e.id_ejecucion ? null : e.id_ejecucion)}>
-                  <td style={{ width: 32 }}>{expandir ? (abierto === e.id_ejecucion ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : null}</td>
-                  <td className="num" style={{ whiteSpace: 'nowrap' }}>{fechaHora(e.inicio)}</td>
+                  <td className="celda-icono">{expandir ? (abierto === e.id_ejecucion ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : null}</td>
+                  <td className="num sin-salto">{fechaHora(e.inicio)}</td>
                   <td>{e.origen === 'automatico' ? 'Programado' : 'Manual'}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}><span className={`punto-estado ${est.clase}`} />{est.texto}</td>
+                  <td className="sin-salto"><span className={`punto-estado ${est.clase}`} />{est.texto}</td>
                   <td className="num">{duracion(e.inicio, e.fin)}</td>
                   <td className="derecha num">{e.placas_consultadas}</td>
                   <td className="derecha num">{e.consultas_ok}</td>
-                  <td className="derecha num" style={{ color: e.consultas_error ? 'var(--oxido)' : undefined, fontWeight: e.consultas_error ? 650 : 400 }}>{e.consultas_error}</td>
-                  <td className="derecha num" style={{ fontWeight: e.nuevas ? 700 : 400 }}>{e.nuevas}</td>
+                  <td className={`derecha num ${e.consultas_error ? 'texto-peligro texto-fuerte' : ''}`}>{e.consultas_error}</td>
+                  <td className={`derecha num ${e.nuevas ? 'texto-fuerte' : ''}`}>{e.nuevas}</td>
                 </tr>
                 {abierto === e.id_ejecucion && (
                   <tr>
                     <td />
                     <td colSpan={8}>
-                      <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)', fontSize: 12.5, color: 'var(--tinta-2)' }}>{e.alertas}</pre>
+                      <pre className="texto-registro">{e.alertas}</pre>
                     </td>
                   </tr>
                 )}

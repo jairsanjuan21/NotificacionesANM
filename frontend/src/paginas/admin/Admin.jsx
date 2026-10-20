@@ -5,6 +5,7 @@ import Barridos from './Barridos';
 import Logs from './Logs';
 import Railway from './Railway';
 import Configuracion from './Configuracion';
+import Diseno from './Diseno';
 
 export default function Admin() {
   return (
@@ -16,6 +17,7 @@ export default function Admin() {
         <NavLink to="/admin/logs">Logs de la aplicación</NavLink>
         <NavLink to="/admin/railway">Railway</NavLink>
         <NavLink to="/admin/configuracion">Configuración</NavLink>
+        <NavLink to="/admin/diseno">Guía de diseño</NavLink>
       </nav>
       <Routes>
         <Route index element={<Resumen />} />
@@ -23,6 +25,7 @@ export default function Admin() {
         <Route path="logs" element={<Logs />} />
         <Route path="railway" element={<Railway />} />
         <Route path="configuracion" element={<Configuracion />} />
+        <Route path="diseno" element={<Diseno />} />
       </Routes>
     </>
   );

@@ -25,15 +25,18 @@ src/
 │   ├── useConsulta.js      carga de datos con carga/error/recarga
 │   ├── useIntervalo.js     sondeo periódico
 │   ├── usePantallaAncha.js media query como estado
-│   └── usePreferencia.js   useState recordado en localStorage
+│   ├── usePreferencia.js   useState recordado en localStorage
+│   └── useTema.js          tema claro/oscuro/sistema compartido
 ├── utilidades/           Funciones puras (sin React)
-│   ├── fechas.js · formato.js · dominio.js · logs.js · diagnostico.js
+│   ├── fechas.js · formato.js · dominio.js · logs.js · diagnostico.js · topografia.js
 │   └── index.js            punto de entrada: import { … } from '../utilidades'
-├── componentes/          Piezas de interfaz reutilizables
+├── componentes/          Piezas del dominio (insignias, detalle, consola…)
+│   └── ui/                 Sistema de diseño: Boton, Tarjeta, Cargando, EstadoVacio,
+│                           MensajeError, Modal, Cajon, SelectorTema, Contornos
 ├── layout/Marco.jsx      Barra lateral + navegación móvil + <Outlet/>
 ├── paginas/              Una carpeta/archivo por ruta (admin/ agrupa el monitoreo)
 └── estilos/              CSS modular
-    ├── tokens.css          colores (light-dark), radios, tipografía
+    ├── tokens.css          colores (light-dark), escalas de texto y espacio, movimiento
     ├── base.css · layout.css · <componente>.css
     └── paginas/<página>.css
 ```
@@ -45,3 +48,8 @@ src/
 3. **Un archivo `.jsx` solo exporta componentes.** Contextos, hooks y funciones van en `.js` (así funciona el Fast Refresh de Vite).
 4. **Ningún color se escribe a mano fuera de `tokens.css`.** Cada mineral tiene un significado: verdín = acción, óxido = urgente/vencido, ocre = por vencer, malaquita = respondida, cuarzo = coactivo/IA.
 5. **El CSS sigue la cascada** tokens → base → layout → componentes → páginas.
+6. **Cargar, vaciar y fallar se dicen con componentes**: `<Cargando>`, `<EstadoVacio>` (con `tono="error"`) y `<MensajeError>`. Nunca un `<div>` suelto con texto.
+7. **Nada de `style={{…}}` salvo valores que vienen de datos** (posiciones calculadas, variables CSS por elemento). Para componer: `.pila`, `.hilera`, `.empujar`, `.estirar`.
+8. **Tamaños y espacios salen de la escala** (`--texto-*`, `--espacio-*`). Si un diseño pide otro valor, se ajusta el diseño.
+
+La **Guía de diseño** (Monitoreo del sistema → Guía de diseño) muestra todos los tokens y componentes en vivo. Si algo no aparece ahí, no es parte del sistema.

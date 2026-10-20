@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { CalendarCheck } from 'lucide-react';
 import { useDatos } from '../contexto/datos';
 import { InsigniaUrgencia, InsigniaEstado } from '../componentes/Insignias';
 import BarraSuperior from '../componentes/BarraSuperior';
 import FiltroFecha from '../componentes/FiltroFecha';
 import Detalle from '../componentes/DetalleNotificacion';
-import Cajon from '../componentes/Cajon';
+import Cajon from '../componentes/ui/Cajon';
+import EstadoVacio from '../componentes/ui/EstadoVacio';
 import { aFecha, mesCorto, nivelPlazo, respondida, textoRestante, tiempoDe, tituloActo } from '../utilidades';
 
 function grupoDe(n, hoy) {
@@ -47,11 +47,9 @@ export default function Agenda() {
       </BarraSuperior>
 
       {items.length === 0 ? (
-        <div className="vacio">
-          <CalendarCheck size={30} className="tenue" />
-          <h3>No hay vencimientos pendientes</h3>
-          <p>Cuando llegue una notificación con plazo, aparecerá aquí ordenada por fecha.</p>
-        </div>
+        <EstadoVacio titulo="No hay vencimientos pendientes">
+          Cuando llegue una notificación con plazo, aparecerá aquí ordenada por fecha.
+        </EstadoVacio>
       ) : (
         <div className="agenda">
           {GRUPOS.filter(g => porGrupo[g.id].length).map(g => (
@@ -71,15 +69,15 @@ export default function Agenda() {
                       <span className="que">
                         <span className="linea1">
                           <span className="placa">{c.placa}</span>
-                          <strong style={{ fontSize: 14 }}>{tituloActo(n)}</strong>
+                          <strong className="acto-agenda">{tituloActo(n)}</strong>
                         </span>
                         <span className="linea2">{n.resumen || c.nombre_empresa}</span>
                       </span>
-                      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                        <strong className="pequeno" style={{ color: nivel === 'critico' ? 'var(--oxido)' : nivel === 'cerca' ? 'var(--ocre)' : 'var(--tinta-2)' }}>
+                      <span className="agenda-estado">
+                        <strong className={`pequeno texto-plazo-${nivel}`}>
                           {textoRestante(n)}
                         </strong>
-                        <span style={{ display: 'flex', gap: 4 }}>
+                        <span className="hilera hueco-1">
                           {n.urgencia === 'alta' && <InsigniaUrgencia notif={n} />}
                           <InsigniaEstado estado={n.estado} />
                         </span>

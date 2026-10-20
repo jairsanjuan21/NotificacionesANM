@@ -1,14 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, Search, Pencil, Trash2, X, Download, FileSpreadsheet, Mail, Mountain } from 'lucide-react';
+import { Plus, Upload, Search, Pencil, Trash2, X, Download, FileSpreadsheet, Mail } from 'lucide-react';
 import api, { API_BASE, mensajeError } from '../servicios/api';
 import { useDatos } from '../contexto/datos';
 import { useAvisos, useConfirmar } from '../contexto/avisos';
-import Modal from '../componentes/Modal';
+import Modal from '../componentes/ui/Modal';
 import { InsigniaEstado } from '../componentes/Insignias';
 import BarraSuperior from '../componentes/BarraSuperior';
 import BotonConsultar from '../componentes/BotonConsultar';
-import Cajon from '../componentes/Cajon';
+import Cajon from '../componentes/ui/Cajon';
+import Boton from '../componentes/ui/Boton';
+import EstadoVacio from '../componentes/ui/EstadoVacio';
 import { REGIONALES, etiquetaRegional, listaRegionales, respondida, tiempoDe, fechaCorta, tituloActo, textoRestante, nivelPlazo } from '../utilidades';
 
 export default function Titulos() {
@@ -67,11 +69,9 @@ export default function Titulos() {
       </div>
 
       {filas.length === 0 ? (
-        <div className="vacio">
-          <Mountain size={30} className="tenue" />
-          <h3>{clientes.length ? 'Ningún título coincide con la búsqueda' : 'Aún no hay títulos registrados'}</h3>
-          <p>{clientes.length ? 'Pruebe con otra placa o titular.' : 'Agregue el primer título minero o importe la lista desde Excel.'}</p>
-        </div>
+        <EstadoVacio titulo={clientes.length ? 'Ningún título coincide con la búsqueda' : 'Aún no hay títulos registrados'}>
+          {clientes.length ? 'Pruebe con otra placa o titular.' : 'Agregue el primer título minero o importe la lista desde Excel.'}
+        </EstadoVacio>
       ) : (
         <div className="tabla-contenedor">
           <table className="tabla">
@@ -92,14 +92,14 @@ export default function Titulos() {
                   <td><span className="placa">{c.placa}</span>{!c.activo && <span className="muy-pequeno tenue"> pausado</span>}</td>
                   <td>
                     {c.nombre_empresa}
-                    {c.email && <div className="muy-pequeno tenue" title="Recibe copia de sus notificaciones"><Mail size={11} style={{ verticalAlign: '-1px' }} /> {c.email}</div>}
+                    {c.email && <div className="muy-pequeno tenue" title="Recibe copia de sus notificaciones"><Mail size={11} className="icono-en-linea" /> {c.email}</div>}
                   </td>
                   <td><span className="regionales">{listaRegionales(c.regional).map(r => <span key={r} className="regional">{etiquetaRegional(r)}</span>)}</span></td>
-                  <td className="derecha num" style={{ fontWeight: pendientes ? 700 : 400, color: pendientes ? 'var(--tinta)' : 'var(--tinta-3)' }}>{pendientes}</td>
+                  <td className={`derecha num ${pendientes ? 'texto-fuerte' : 'texto-apagado'}`}>{pendientes}</td>
                   <td>
                     {proximo ? (
-                      <span style={{ whiteSpace: 'nowrap', color: nivelPlazo(proximo) === 'critico' ? 'var(--oxido)' : nivelPlazo(proximo) === 'cerca' ? 'var(--ocre)' : undefined, fontWeight: 600 }}>
-                        {fechaCorta(proximo.fecha_limite)} <span className="pequeno" style={{ fontWeight: 500 }}>({textoRestante(proximo).toLowerCase()})</span>
+                      <span className={`proximo-plazo texto-plazo-${nivelPlazo(proximo)}`}>
+                        {fechaCorta(proximo.fecha_limite)} <span className="pequeno">({textoRestante(proximo).toLowerCase()})</span>
                       </span>
                     ) : <span className="tenue">—</span>}
                   </td>
@@ -128,7 +128,7 @@ function FichaTitulo({ fila, onCerrar, onEditar }) {
     <Cajon onCerrar={onCerrar}>
       <div className="panel-detalle">
         <header className="detalle-cabecera">
-          <div style={{ minWidth: 0 }}>
+          <div className="encoger">
             <div className="placa">{c.placa}</div>
             <div className="titular">{c.nombre_empresa}</div>
             <div className="detalle-insignias">
@@ -138,9 +138,9 @@ function FichaTitulo({ fila, onCerrar, onEditar }) {
           <button className="boton-icono cerrar" onClick={onCerrar} aria-label="Cerrar"><X size={20} /></button>
         </header>
         <div className="detalle-cuerpo">
-          <section className="bloque" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <section className="bloque hilera">
             <BotonConsultar idCliente={c.id_cliente} placa={c.placa} />
-            <button className="boton secundario" onClick={onEditar}><Pencil size={16} /> Editar datos</button>
+            <Boton variante="secundario" icono={Pencil} onClick={onEditar}>Editar datos</Boton>
           </section>
           <section className="bloque">
             <h3>Datos del título</h3>
@@ -161,7 +161,7 @@ function FichaTitulo({ fila, onCerrar, onEditar }) {
                   <li key={n.id_notificacion}>
                     <button onClick={() => navegar(`/?filtro=todas&n=${n.id_notificacion}`)}>
                       <span className="num secundario-texto pequeno">{fechaCorta(n.fecha_aviso)}</span>
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tituloActo(n)}</span>
+                      <span className="recortar">{tituloActo(n)}</span>
                       <InsigniaEstado estado={n.estado} />
                     </button>
                   </li>
@@ -228,12 +228,19 @@ function FormularioTitulo({ cliente, onCerrar, onGuardado, onEliminado }) {
   };
 
   return (
-    <Modal titulo={nuevo ? 'Agregar título minero' : `Editar ${cliente.placa}`} onCerrar={onCerrar} ancho={620}>
-      <form onSubmit={guardar} id="form-titulo" style={{ display: 'grid', gap: 16 }}>
+    <Modal titulo={nuevo ? 'Agregar título minero' : `Editar ${cliente.placa}`} onCerrar={onCerrar} ancho={620} pie={
+      <>
+        {!nuevo && <Boton variante="peligro-suave" icono={Trash2} onClick={eliminar}>Eliminar</Boton>}
+        <span className="estirar" />
+        <Boton variante="secundario" onClick={onCerrar}>Cancelar</Boton>
+        <Boton type="submit" form="form-titulo" cargando={guardando}>{nuevo ? 'Agregar título' : 'Guardar cambios'}</Boton>
+      </>
+    }>
+      <form onSubmit={guardar} id="form-titulo" className="pila hueco-4">
         <div className="rejilla-2">
           <div className="grupo-campo">
             <label className="etiqueta" htmlFor="f-placa">Placa</label>
-            <input id="f-placa" className="campo placa" style={{ fontSize: 17 }} value={placa} onChange={(e) => setPlaca(e.target.value)}
+            <input id="f-placa" className="campo placa campo-placa" value={placa} onChange={(e) => setPlaca(e.target.value)}
               placeholder="HAN-111" required />
           </div>
           <div className="grupo-campo">
@@ -264,13 +271,6 @@ function FormularioTitulo({ cliente, onCerrar, onGuardado, onEliminado }) {
           <input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} /> Vigilar este título en los barridos
         </label>
       </form>
-      <div className="modal-pie" style={{ padding: '14px 0 16px', justifyContent: 'space-between' }}>
-        {!nuevo ? <button className="boton fantasma" style={{ color: 'var(--oxido)' }} onClick={eliminar}><Trash2 size={16} /> Eliminar</button> : <span />}
-        <span style={{ display: 'flex', gap: 8 }}>
-          <button className="boton secundario" onClick={onCerrar}>Cancelar</button>
-          <button className="boton" type="submit" form="form-titulo" disabled={guardando}>{guardando ? 'Guardando…' : nuevo ? 'Agregar título' : 'Guardar cambios'}</button>
-        </span>
-      </div>
     </Modal>
   );
 }
@@ -299,13 +299,13 @@ function ImportarTitulos({ onCerrar, onImportado }) {
   };
 
   return (
-    <Modal titulo="Importar títulos desde Excel" onCerrar={onCerrar} pie={<button className="boton" onClick={onCerrar}>{resultado ? 'Listo' : 'Cerrar'}</button>}>
+    <Modal titulo="Importar títulos desde Excel" onCerrar={onCerrar} pie={<Boton onClick={onCerrar}>{resultado ? 'Listo' : 'Cerrar'}</Boton>}>
       {resultado ? (
         <div>
           <p><strong>{resultado.creados}</strong> títulos nuevos y <strong>{resultado.actualizados}</strong> actualizados.</p>
           {resultado.omitidos.length > 0 && (
             <>
-              <p style={{ marginTop: 10 }}>Filas omitidas:</p>
+              <p className="separado-arriba">Filas omitidas:</p>
               <ul className="pequeno secundario-texto">{resultado.omitidos.map(o => <li key={o}>{o}</li>)}</ul>
             </>
           )}
@@ -326,7 +326,7 @@ function ImportarTitulos({ onCerrar, onImportado }) {
             <span className="pequeno">Excel (.xlsx) o CSV</span>
             <input ref={entrada} type="file" accept=".xlsx,.csv" hidden onChange={(e) => subir(e.target.files?.[0])} />
           </div>
-          <a className="pequeno" href={`${API_BASE}/clientes/plantilla`}><Download size={13} style={{ verticalAlign: '-2px' }} /> Descargar una plantilla de ejemplo</a>
+          <a className="pequeno" href={`${API_BASE}/clientes/plantilla`}><Download size={13} className="icono-en-linea" /> Descargar una plantilla de ejemplo</a>
         </>
       )}
     </Modal>

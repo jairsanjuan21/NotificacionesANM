@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { X, Sparkles, ExternalLink, FileText, Trash2, Save, Loader2 } from 'lucide-react';
+import { X, Sparkles, ExternalLink, FileText, Trash2, Save } from 'lucide-react';
 import api, { API_BASE, mensajeError } from '../servicios/api';
 import { useDatos } from '../contexto/datos';
 import { useAvisos, useConfirmar } from '../contexto/avisos';
+import Boton from './ui/Boton';
 import { InsigniaUrgencia, InsigniaEstado, InsigniaCoactivo } from './Insignias';
 import { ESTADOS, fechaLarga, fechaCorta, fechaHora, nivelPlazo, textoRestante, tituloActo, nombreDocumento, listaRegionales, etiquetaRegional } from '../utilidades';
 
@@ -79,7 +80,7 @@ export default function Detalle({ notif, onCerrar }) {
   return (
     <article className="panel-detalle" aria-label={`Notificación de ${cliente.placa}`}>
       <header className="detalle-cabecera">
-        <div style={{ minWidth: 0 }}>
+        <div className="encoger">
           <div className="placa">{cliente.placa || '—'}</div>
           <div className="titular">{cliente.nombre_empresa}</div>
           <div className="detalle-insignias">
@@ -93,7 +94,7 @@ export default function Detalle({ notif, onCerrar }) {
 
       <div className="detalle-cuerpo">
         <section className="bloque">
-          <h2 style={{ fontSize: 18, marginBottom: 10 }}>{tituloActo(notif)}</h2>
+          <h2 className="titulo-acto">{tituloActo(notif)}</h2>
           {notif.resumen ? (
             <div className="resumen-ia">
               <div className="origen"><Sparkles size={13} /> Resumen generado con IA</div>
@@ -104,11 +105,10 @@ export default function Detalle({ notif, onCerrar }) {
           ) : (
             <p className="motivo">Aún no se ha leído el contenido de este documento.</p>
           )}
-          <div style={{ marginTop: 10 }}>
-            <button className="boton ia pequeno" onClick={resumir} disabled={guardando === 'ia'}>
-              {guardando === 'ia' ? <Loader2 size={15} className="girando" /> : <Sparkles size={15} />}
+          <div className="separado-arriba">
+            <Boton variante="ia" tamano="pequeno" icono={Sparkles} cargando={guardando === 'ia'} onClick={resumir}>
               {guardando === 'ia' ? 'Leyendo el acto, puede tardar un minuto…' : notif.resumen ? 'Generar otro resumen' : 'Resumir con IA'}
-            </button>
+            </Boton>
           </div>
         </section>
 
@@ -145,17 +145,15 @@ export default function Detalle({ notif, onCerrar }) {
               </button>
             ))}
           </div>
-          <div className="grupo-campo" style={{ marginTop: 14 }}>
+          <div className="grupo-campo separado-arriba">
             <label className="etiqueta" htmlFor={`notas-${notif.id_notificacion}`}>Notas</label>
             <textarea id={`notas-${notif.id_notificacion}`} className="campo" rows={3} value={notas}
               placeholder="Ej.: Radicado el PTO el 20 de octubre, radicado No. 2026-123."
               onChange={(e) => setNotas(e.target.value)} />
             {notasCambiaron && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="boton pequeno" onClick={() => guardar({ notas }, 'notas')} disabled={guardando === 'notas'}>
-                  <Save size={15} /> Guardar notas
-                </button>
-                <button className="boton fantasma pequeno" onClick={() => setNotas(notif.notas || '')}>Descartar</button>
+              <div className="hilera separado-arriba">
+                <Boton tamano="pequeno" icono={Save} cargando={guardando === 'notas'} onClick={() => guardar({ notas }, 'notas')}>Guardar notas</Boton>
+                <Boton variante="fantasma" tamano="pequeno" onClick={() => setNotas(notif.notas || '')}>Descartar</Boton>
               </div>
             )}
           </div>
@@ -191,9 +189,7 @@ export default function Detalle({ notif, onCerrar }) {
             <dt>Correo</dt><dd>{notif.notificacion_enviada ? 'Enviado' : 'Pendiente de envío'}</dd>
             <dt>Detectada</dt><dd>{fechaHora(notif.fecha_registro)}</dd>
           </dl>
-          <button className="boton fantasma pequeno" onClick={quitar} style={{ marginTop: 14, color: 'var(--oxido)' }}>
-            <Trash2 size={15} /> Quitar notificación
-          </button>
+          <Boton variante="peligro-suave" tamano="pequeno" icono={Trash2} onClick={quitar} className="separado-arriba">Quitar notificación</Boton>
         </section>
       </div>
     </article>

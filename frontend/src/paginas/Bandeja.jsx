@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, ArrowUpDown, Inbox } from 'lucide-react';
+import { Search, ArrowUpDown, RefreshCw } from 'lucide-react';
 import api, { mensajeError } from '../servicios/api';
 import { useDatos } from '../contexto/datos';
 import { useAvisos, useConfirmar } from '../contexto/avisos';
@@ -9,7 +9,10 @@ import BarraSuperior from '../componentes/BarraSuperior';
 import FiltroFecha from '../componentes/FiltroFecha';
 import BotonConsultar from '../componentes/BotonConsultar';
 import Detalle from '../componentes/DetalleNotificacion';
-import Cajon from '../componentes/Cajon';
+import Cajon from '../componentes/ui/Cajon';
+import Boton from '../componentes/ui/Boton';
+import Cargando from '../componentes/ui/Cargando';
+import EstadoVacio from '../componentes/ui/EstadoVacio';
 import usePantallaAncha from '../hooks/usePantallaAncha';
 import {
   REGIONALES, URGENCIAS, listaRegionales, prioridad, requiereAtencion, respondida,
@@ -121,14 +124,13 @@ export default function Bandeja() {
     }
   };
 
-  if (cargando) return <div className="cargando">Cargando notificaciones…</div>;
+  if (cargando) return <Cargando>Cargando notificaciones…</Cargando>;
   if (error) {
     return (
-      <div className="vacio">
-        <h3>No se pudieron cargar las notificaciones</h3>
-        <p>{mensajeError(error)}</p>
-        <button className="boton" onClick={recargar}>Intentar de nuevo</button>
-      </div>
+      <EstadoVacio tono="error" titulo="No se pudieron cargar las notificaciones"
+        accion={<Boton icono={RefreshCw} onClick={recargar}>Intentar de nuevo</Boton>}>
+        {mensajeError(error)}
+      </EstadoVacio>
     );
   }
 
@@ -177,7 +179,7 @@ export default function Bandeja() {
           {REGIONALES.map(r => <option key={r.id} value={r.id}>{r.etiqueta}</option>)}
         </select>
         <span className="separador" />
-        <label className="pequeno tenue" htmlFor="orden" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <label className="pequeno tenue hilera hueco-1" htmlFor="orden">
           <ArrowUpDown size={15} /> Ordenar
         </label>
         <select id="orden" className="campo" value={orden} onChange={(e) => setOrden(e.target.value)}>
@@ -197,12 +199,15 @@ export default function Bandeja() {
           </div>
 
           {visibles.length === 0 ? (
-            <div className="vacio">
-              <Inbox size={28} className="tenue" />
-              <h3>{filtro === 'atencion' ? 'No hay nada que requiera atención' : 'Ninguna notificación coincide'}</h3>
-              <p>{filtro === 'atencion' ? 'Las notificaciones urgentes y las que vencen en los próximos 5 días hábiles aparecerán aquí.' : 'Pruebe con otro filtro o borre la búsqueda.'}</p>
-              {filtro !== 'todas' && <button className="boton secundario" onClick={() => { setFiltro('todas'); setBusqueda(''); setRegional(''); }}>Ver todas</button>}
-            </div>
+            <EstadoVacio
+              titulo={filtro === 'atencion' ? 'No hay nada que requiera atención' : 'Ninguna notificación coincide'}
+              accion={filtro !== 'todas' && (
+                <Boton variante="secundario" onClick={() => { setFiltro('todas'); setBusqueda(''); setRegional(''); }}>Ver todas</Boton>
+              )}>
+              {filtro === 'atencion'
+                ? 'Las notificaciones urgentes y las que vencen en los próximos 5 días hábiles aparecerán aquí.'
+                : 'Pruebe con otro filtro o borre la búsqueda.'}
+            </EstadoVacio>
           ) : (
             <div role="listbox" aria-label="Notificaciones">
               {visibles.slice(0, mostrar).map(n => {
@@ -226,7 +231,7 @@ export default function Bandeja() {
                       <span className="acto">
                         <span>{tituloActo(n)}</span>
                         {!respondida(n) && u && n.urgencia !== 'baja' && n.urgencia !== 'media' && (
-                          <span className={`insignia ${u.clase}`} style={{ height: 20, fontSize: 11.5, padding: '0 7px' }}>{u.etiqueta}</span>
+                          <span className={`insignia mini ${u.clase}`}>{u.etiqueta}</span>
                         )}
                       </span>
                       <span className="extracto">
@@ -247,7 +252,7 @@ export default function Bandeja() {
               {visibles.length} de {enPeriodo.length} notificaciones
               {fechaDesde && ocultas > 0 && <>, {ocultas} anteriores al {fechaCorta(fechaDesde)} ocultas</>}
             </span>
-            <span style={{ display: 'flex', gap: 8 }}>
+            <span className="hilera">
               {antiguasSinResolver > 0 && (
                 <button className="boton fantasma pequeno" onClick={marcarAntiguas}>Marcar {antiguasSinResolver} anteriores como respondidas</button>
               )}

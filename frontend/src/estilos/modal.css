@@ -4,7 +4,7 @@
   position: fixed; inset: 0; z-index: 50;
   display: grid; place-items: center;
   padding: 16px;
-  background: rgba(16, 22, 26, .5);
+  background: var(--velo);
   animation: aparecer .15s ease-out;
 }
 .modal {
@@ -16,7 +16,7 @@
   box-shadow: 0 24px 60px rgba(0, 0, 0, .3);
 }
 .modal-cabecera { display: flex; align-items: center; gap: 10px; padding: 18px 20px 6px; }
-.modal-cabecera h2 { font-size: 19px; }
+.modal-cabecera h2 { font-size: var(--texto-xl); }
 .modal-cabecera .boton-icono { margin-left: auto; }
 .modal-cuerpo { padding: 10px 20px 4px; display: grid; gap: 16px; }
 .modal-cuerpo p { color: var(--tinta-2); }

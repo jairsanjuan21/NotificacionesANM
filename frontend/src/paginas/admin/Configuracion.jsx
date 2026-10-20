@@ -1,6 +1,8 @@
-import { CheckCircle2, CircleDashed, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, CircleDashed, XCircle } from 'lucide-react';
 import api, { mensajeError } from '../../servicios/api';
 import useConsulta from '../../hooks/useConsulta';
+import Cargando from '../../componentes/ui/Cargando';
+import EstadoVacio from '../../componentes/ui/EstadoVacio';
 
 function Fila({ estado, titulo, children }) {
   const Icono = estado === 'ok' ? CheckCircle2 : estado === 'mal' ? XCircle : CircleDashed;
@@ -20,8 +22,8 @@ export default function Configuracion() {
   const { diag, railway } = datos || {};
   const error = fallo && mensajeError(fallo);
 
-  if (error) return <div className="vacio"><h3>No se pudo leer la configuración</h3><p>{error}</p></div>;
-  if (!diag) return <div className="cargando"><Loader2 size={18} className="girando" /> Leyendo configuración…</div>;
+  if (error) return <EstadoVacio tono="error" titulo="No se pudo leer la configuración">{error}</EstadoVacio>;
+  if (!diag) return <Cargando>Leyendo configuración…</Cargando>;
 
   const correoOk = diag.modo_envio === 'brevo_api' && diag.EMAIL_SENDER && diag.EMAIL_RECEIVER;
   const volumen = !diag.base_de_datos?.startsWith('repositorio');

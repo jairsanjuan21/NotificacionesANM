@@ -25,7 +25,7 @@ export default function Barras({ datos, series, etiqueta, alto = 180, formatoEje
     <div className="grafico">
       {series.length > 1 && (
         <div className="leyenda">
-          {series.map(s => <span key={s.clave}><i style={{ background: `var(${s.clase === 'barra-alerta' ? '--grafico-alerta' : '--grafico-1'})` }} />{s.nombre}</span>)}
+          {series.map(s => <span key={s.clave}><i className={s.clase} />{s.nombre}</span>)}
         </div>
       )}
       <svg viewBox={`0 0 ${ancho} ${alto}`} role="img" aria-label={descripcion}>

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Download, Pause, Play, ArrowDownToLine } from 'lucide-react';
 import api, { mensajeError } from '../../servicios/api';
 import ConsolaLogs from '../../componentes/ConsolaLogs';
+import Boton from '../../componentes/ui/Boton';
+import MensajeError from '../../componentes/ui/MensajeError';
 import { esPeticionNormal } from '../../utilidades';
 
 const MAX_LINEAS = 4000;
@@ -66,8 +68,8 @@ export default function Logs() {
   const cuentaErrores = lineas.filter(l => l.nivel === 'error').length;
 
   return (
-    <>
-      <p className="secundario-texto" style={{ marginBottom: 14, maxWidth: '75ch' }}>
+    <div className="pila">
+      <p className="secundario-texto medida">
         Todo lo que imprime la aplicación: barridos, envíos de correo, inicios de sesión y errores. Se guarda en el Volume, así que
         se conserva entre reinicios y deploys (últimas {MAX_LINEAS.toLocaleString('es-CO')} líneas en pantalla).
       </p>
@@ -84,21 +86,19 @@ export default function Logs() {
         <label className="interruptor pequeno">
           <input type="checkbox" checked={ocultarHttp} onChange={(e) => setOcultarHttp(e.target.checked)} /> Ocultar peticiones del panel
         </label>
-        <span className="separador" style={{ flex: 1 }} />
-        <button className="boton secundario pequeno" onClick={() => setEnVivo(v => !v)} aria-pressed={enVivo}>
-          {enVivo ? <><Pause size={15} /> Pausar</> : <><Play size={15} /> En vivo</>}
-        </button>
-        {!alFinal && (
-          <button className="boton secundario pequeno" onClick={() => { setAlFinal(true); }}><ArrowDownToLine size={15} /> Ir al final</button>
-        )}
-        <button className="boton secundario pequeno" onClick={descargar}><Download size={15} /> Descargar</button>
+        <span className="estirar" />
+        <Boton variante="secundario" tamano="pequeno" icono={enVivo ? Pause : Play} onClick={() => setEnVivo(v => !v)} aria-pressed={enVivo}>
+          {enVivo ? 'Pausar' : 'En vivo'}
+        </Boton>
+        {!alFinal && <Boton variante="secundario" tamano="pequeno" icono={ArrowDownToLine} onClick={() => setAlFinal(true)}>Ir al final</Boton>}
+        <Boton variante="secundario" tamano="pequeno" icono={Download} onClick={descargar}>Descargar</Boton>
       </div>
-      {error && <div className="mensaje-error" style={{ marginBottom: 10 }}>{error}</div>}
+      <MensajeError>{error}</MensajeError>
       <ConsolaLogs lineas={visibles} busqueda={busqueda} contenedorRef={ref} onScroll={alDesplazar}
         vacio={busqueda || nivel !== 'todos' ? 'Ninguna línea coincide con el filtro.' : 'Aún no hay líneas registradas.'} />
-      <p className="muy-pequeno tenue" style={{ marginTop: 8 }}>
+      <p className="muy-pequeno tenue">
         {enVivo ? 'Actualizando cada 4 segundos.' : 'En pausa.'} {visibles.length.toLocaleString('es-CO')} líneas visibles.
       </p>
-    </>
+    </div>
   );
 }
