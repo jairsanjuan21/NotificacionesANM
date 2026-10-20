@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import api, { mensajeError } from '../../api';
-import { fechaHora } from '../../util';
+import api, { mensajeError } from '../../servicios/api';
+import useConsulta from '../../hooks/useConsulta';
+import { fechaHora } from '../../utilidades';
 
 const ESTADO = {
   ok: { texto: 'Correcto', clase: 'ok' },
@@ -17,15 +18,9 @@ function duracion(a, b) {
 }
 
 export default function Barridos() {
-  const [lista, setLista] = useState(null);
-  const [error, setError] = useState(null);
+  const { datos: lista, error: fallo } = useConsulta('barridos', () => api.get('/ejecuciones', { params: { limite: 100 } }).then(r => r.data));
+  const error = fallo && mensajeError(fallo);
   const [abierto, setAbierto] = useState(null);
-
-  useEffect(() => {
-    api.get('/ejecuciones', { params: { limite: 100 } })
-      .then(r => setLista(r.data))
-      .catch(e => setError(mensajeError(e)));
-  }, []);
 
   if (error) return <div className="vacio"><h3>No se pudo cargar el historial</h3><p>{error}</p></div>;
   if (!lista) return <div className="cargando"><Loader2 size={18} className="girando" /> Cargando barridos…</div>;

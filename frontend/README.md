@@ -1,16 +1,47 @@
-# React + Vite
+# Frontend — Notificaciones ANM
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Panel web para seguir las notificaciones que la Agencia Nacional de Minería publica sobre los títulos mineros registrados. React 19 + Vite + React Router, sin librerías de UI: el sistema de diseño es propio.
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev      # http://localhost:5173 (espera el backend en http://127.0.0.1:8000)
+npm run lint     # debe quedar en cero
+npm run build    # genera dist/, que el backend sirve en producción
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Estructura
 
-## React Compiler
+```
+src/
+├── main.jsx              Arranque: router, fuente y estilos
+├── App.jsx               Sesión y rutas
+├── servicios/api.js      Cliente HTTP único (axios + cookie de sesión + 401)
+├── contexto/             Estado global
+│   ├── datos.js            contexto + hook useDatos()
+│   ├── ProveedorDatos.jsx  carga clientes y notificaciones
+│   ├── avisos.js           contextos + hooks useAvisos() / useConfirmar()
+│   └── ProveedorAvisos.jsx toasts y diálogo de confirmación
+├── hooks/                Lógica reutilizable sin interfaz
+│   ├── useConsulta.js      carga de datos con carga/error/recarga
+│   ├── useIntervalo.js     sondeo periódico
+│   ├── usePantallaAncha.js media query como estado
+│   └── usePreferencia.js   useState recordado en localStorage
+├── utilidades/           Funciones puras (sin React)
+│   ├── fechas.js · formato.js · dominio.js · logs.js · diagnostico.js
+│   └── index.js            punto de entrada: import { … } from '../utilidades'
+├── componentes/          Piezas de interfaz reutilizables
+├── layout/Marco.jsx      Barra lateral + navegación móvil + <Outlet/>
+├── paginas/              Una carpeta/archivo por ruta (admin/ agrupa el monitoreo)
+└── estilos/              CSS modular
+    ├── tokens.css          colores (light-dark), radios, tipografía
+    ├── base.css · layout.css · <componente>.css
+    └── paginas/<página>.css
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Reglas de la casa
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. **Las páginas no llaman `useEffect` para cargar datos**: usan `useConsulta(clave, fn)`. Si la clave cambia, vuelve a consultar; las respuestas viejas se descartan.
+2. **Si un valor se puede calcular, no se guarda en estado.** Ejemplos: el deployment elegido en Railway, `cargando` en `useConsulta`, la página de la bandeja.
+3. **Un archivo `.jsx` solo exporta componentes.** Contextos, hooks y funciones van en `.js` (así funciona el Fast Refresh de Vite).
+4. **Ningún color se escribe a mano fuera de `tokens.css`.** Cada mineral tiene un significado: verdín = acción, óxido = urgente/vencido, ocre = por vencer, malaquita = respondida, cuarzo = coactivo/IA.
+5. **El CSS sigue la cascada** tokens → base → layout → componentes → páginas.

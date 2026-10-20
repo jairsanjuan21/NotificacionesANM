@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { BarraSuperior } from '../Marco';
+import BarraSuperior from '../../componentes/BarraSuperior';
 import Resumen from './Resumen';
 import Barridos from './Barridos';
 import Logs from './Logs';

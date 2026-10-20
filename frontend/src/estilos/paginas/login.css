@@ -1,0 +1,30 @@
+/* Inicio de sesión */
+
+.pantalla-login {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 480px);
+}
+.login-paisaje {
+  position: relative; overflow: hidden;
+  background: var(--pizarra);
+  color: #fff;
+  padding: 48px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.login-paisaje svg.contornos { position: absolute; inset: -10% -10% -10% -10%; width: 120%; height: 120%; color: var(--acento-pizarra); opacity: .22; }
+.login-paisaje .lema { position: relative; max-width: 30ch; }
+.login-paisaje .lema h1 { font-size: 40px; font-stretch: 80%; letter-spacing: -0.01em; line-height: 1.05; }
+.login-paisaje .lema p { margin-top: 12px; color: var(--pizarra-tinta); font-size: 16px; }
+.login-formulario { display: flex; flex-direction: column; justify-content: center; padding: 48px; background: var(--superficie); }
+.login-formulario form { display: grid; gap: 16px; }
+.login-formulario h2 { font-size: 24px; margin-bottom: 4px; }
+.login-formulario .campo { height: 44px; }
+.login-formulario .boton { height: 44px; }
+.mensaje-error { padding: 10px 12px; border-radius: var(--radio-m); background: var(--oxido-suave); color: var(--oxido); font-size: 14px; }
+@media (max-width: 860px) {
+  .pantalla-login { grid-template-columns: 1fr; }
+  .login-paisaje { min-height: 200px; padding: 28px; }
+  .login-paisaje .lema h1 { font-size: 30px; }
+  .login-formulario { padding: 28px 20px; }
+}

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, AlertTriangle, Send, Mail, Globe, BellRing, Archive, Loader2, RefreshCw } from 'lucide-react';
-import api, { mensajeError } from '../../api';
-import { useAvisos } from '../../ui/Avisos';
-import { useDatos } from '../../datos';
+import api, { mensajeError } from '../../servicios/api';
+import { useAvisos } from '../../contexto/avisos';
+import { useDatos } from '../../contexto/datos';
 import Barras from './Barras';
-import { bytesLegibles, haceCuanto, fechaHora } from '../../util';
+import useConsulta from '../../hooks/useConsulta';
+import useIntervalo from '../../hooks/useIntervalo';
+import { bytesLegibles, diagnosticarProblemas, fechaHora, haceCuanto } from '../../utilidades';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -13,55 +15,27 @@ function duracionLegible(seg) {
   return seg < 60 ? `${seg} s` : `${Math.floor(seg / 60)} min ${seg % 60} s`;
 }
 
-export function diagnosticarProblemas(m, diag) {
-  const problemas = [];
-  if (!m) return problemas;
-  const b = m.barridos;
-  if (!b.ultimo_exitoso) problemas.push('No hay ningún barrido exitoso registrado todavía.');
-  else {
-    const horas = (Date.now() - new Date(b.ultimo_exitoso).getTime()) / 36e5;
-    if (horas > 72) problemas.push(`El último barrido correcto fue ${haceCuanto(b.ultimo_exitoso)}.`);
-  }
-  if (b.ultimo_estado === 'fallida') problemas.push('El último barrido falló. Revise la pestaña Barridos o los logs.');
-  if (b.ultimo_estado === 'con_alertas') problemas.push('El último barrido terminó con alertas.');
-  if (m.notificaciones.pendientes_envio > 0) problemas.push(`${m.notificaciones.pendientes_envio} notificaciones no se han podido enviar por correo.`);
-  if (diag && diag.modo_envio === 'sin_configurar') problemas.push('El envío de correos no está configurado.');
-  if (diag && diag.base_de_datos?.startsWith('repositorio')) problemas.push('La base de datos no está en un Volume: los cambios se pierden en cada deploy.');
-  return problemas;
+async function consultarResumen() {
+  const [metricas, diag, agenda, historico] = await Promise.all([
+    api.get('/admin/metricas'), api.get('/correo/diagnostico'),
+    api.get('/scheduler/estado'), api.get('/mantenimiento/procesar-historico'),
+  ]);
+  return { m: metricas.data, diag: diag.data, agenda: agenda.data, historico: historico.data };
 }
 
 export default function Resumen() {
   const avisos = useAvisos();
-  const { recargar } = useDatos();
-  const [m, setM] = useState(null);
-  const [diag, setDiag] = useState(null);
-  const [agenda, setAgenda] = useState(null);
-  const [historico, setHistorico] = useState(null);
+  const { recargar: recargarDatos } = useDatos();
+  const { datos, error, recargar: cargar, fijarDatos } = useConsulta('admin-resumen', consultarResumen);
+  const { m, diag, agenda, historico } = datos || {};
   const [ocupado, setOcupado] = useState(null);
-  const [error, setError] = useState(null);
 
-  const cargar = useCallback(async () => {
-    try {
-      const [a, b, c, d] = await Promise.all([
-        api.get('/admin/metricas'), api.get('/correo/diagnostico'), api.get('/scheduler/estado'), api.get('/mantenimiento/procesar-historico'),
-      ]);
-      setM(a.data); setDiag(b.data); setAgenda(c.data); setHistorico(d.data); setError(null);
-    } catch (e) {
-      setError(mensajeError(e));
-    }
-  }, []);
-
-  useEffect(() => { cargar(); }, [cargar]);
-
-  useEffect(() => {
-    if (!historico?.en_curso) return undefined;
-    const t = setInterval(async () => {
-      const h = await api.get('/mantenimiento/procesar-historico');
-      setHistorico(h.data);
-      if (!h.data.en_curso) { cargar(); recargar(); }
-    }, 5000);
-    return () => clearInterval(t);
-  }, [historico?.en_curso, cargar, recargar]);
+  // Mientras se procesa el histórico, consultar su avance cada 5 s
+  useIntervalo(async () => {
+    const h = await api.get('/mantenimiento/procesar-historico');
+    fijarDatos(d => ({ ...d, historico: h.data }));
+    if (!h.data.en_curso) { cargar(); recargarDatos(); }
+  }, historico?.en_curso ? 5000 : null);
 
   const accion = async (id, metodo, url, exito) => {
     setOcupado(id);
@@ -76,7 +50,7 @@ export default function Resumen() {
     }
   };
 
-  if (error) return <div className="vacio"><h3>No se pudo cargar el monitoreo</h3><p>{error}</p><button className="boton" onClick={cargar}>Intentar de nuevo</button></div>;
+  if (error && !m) return <div className="vacio"><h3>No se pudo cargar el monitoreo</h3><p>{mensajeError(error)}</p><button className="boton" onClick={cargar}>Intentar de nuevo</button></div>;
   if (!m) return <div className="cargando"><Loader2 size={18} className="girando" /> Cargando métricas…</div>;
 
   const problemas = diagnosticarProblemas(m, diag);

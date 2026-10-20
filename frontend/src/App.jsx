@@ -1,31 +1,25 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import api, { registrarAlExpirar } from './api';
-import { ProveedorAvisos } from './ui/Avisos';
-import { ProveedorDatos } from './datos';
-import Marco from './paginas/Marco';
+import api, { registrarAlExpirar } from './servicios/api';
+import useConsulta from './hooks/useConsulta';
+import ProveedorAvisos from './contexto/ProveedorAvisos';
+import ProveedorDatos from './contexto/ProveedorDatos';
+import Marco from './layout/Marco';
 import Login from './paginas/Login';
 import Bandeja from './paginas/Bandeja';
 import Agenda from './paginas/Agenda';
 import Titulos from './paginas/Titulos';
 import Admin from './paginas/admin/Admin';
 
+/** Pregunta al backend quién tiene la sesión abierta; null si nadie. */
+const consultarSesion = () => api.get('/auth/yo').then(r => r.data).catch(() => null);
+
 export default function App() {
-  const [sesion, setSesion] = useState(undefined); // undefined = comprobando, null = sin sesión
+  // datos: undefined = comprobando · null = sin sesión · objeto = usuario
+  const { datos: sesion, fijarDatos: setSesion } = useConsulta('sesion', consultarSesion);
 
-  const comprobar = useCallback(async () => {
-    try {
-      const r = await api.get('/auth/yo');
-      setSesion(r.data);
-    } catch {
-      setSesion(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    comprobar();
-    registrarAlExpirar(() => setSesion(null));
-  }, [comprobar]);
+  // Si cualquier petición recibe 401, volver a la pantalla de inicio de sesión
+  useEffect(() => registrarAlExpirar(() => setSesion(null)), [setSesion]);
 
   const salir = async () => {
     try { await api.post('/auth/logout'); } catch { /* sin conexión: igual se cierra */ }

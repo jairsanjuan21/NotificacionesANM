@@ -1,0 +1,70 @@
+/* =====================================================================
+   Tokens de diseño — Notificaciones ANM
+   Paleta tomada de la geología: pizarra, roca, verdín de cobre, óxido,
+   ocre, malaquita y cuarzo. Tipografía única: Archivo (ancho variable).
+
+   Modo claro/oscuro sin duplicar: cada color se declara UNA sola vez con
+   light-dark(claro, oscuro). El navegador elige según `color-scheme`:
+     - por defecto sigue al sistema operativo (light dark)
+     - <html data-theme="light|dark"> fuerza uno de los dos
+   ===================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  /* Superficies (de la roca al papel) */
+  --roca: light-dark(#ECEEE9, #161D21);
+  --superficie: light-dark(#FFFFFF, #1E272C);
+  --superficie-2: light-dark(#F6F7F4, #232E34);
+  --superficie-hundida: light-dark(#E3E6E0, #121819);
+  --linea: light-dark(#D5D9D2, #34424A);
+  --linea-suave: light-dark(#E6E9E3, #2A363D);
+
+  /* Texto */
+  --tinta: light-dark(#1F2A30, #E6ECEB);
+  --tinta-2: light-dark(#4A575E, #B3C0C2);
+  --tinta-3: light-dark(#6E7A80, #8696A0);
+
+  /* Barra lateral (pizarra: oscura en ambos modos) */
+  --pizarra: light-dark(#1F2A30, #10161A);
+  --pizarra-2: light-dark(#2A3840, #1B2429);
+  --pizarra-tinta: #D9E1E0;
+  --pizarra-tinta-2: #93A3A6;
+  --acento-pizarra: #5FB3A8;  /* verdín luminoso sobre la pizarra (logo, curvas de nivel) */
+
+  /* Minerales: cada color tiene un significado */
+  --verdin: light-dark(#2F7D74, #4FB0A3);  /* acción principal, enlaces, selección */
+  --verdin-fuerte: light-dark(#256860, #6CC3B6);
+  --verdin-suave: light-dark(#E1EFEC, #1C3A37);
+  --sobre-verdin: light-dark(#FFFFFF, #0E2421);
+  --oxido: light-dark(#B4412F, #E07A63);  /* urgente, vencido, error */
+  --oxido-suave: light-dark(#F8E6E2, #3D2420);
+  --ocre: light-dark(#9A6416, #D9A44C);  /* por vencer, advertencia */
+  --ocre-suave: light-dark(#F7EDDA, #3A2F1C);
+  --malaquita: light-dark(#4E7D3A, #8DBE73);  /* respondida, éxito */
+  --malaquita-suave: light-dark(#E6EFE0, #263424);
+  --cuarzo: light-dark(#6E5A9E, #A995D8);  /* cobro coactivo, IA, revisar a mano */
+  --cuarzo-suave: light-dark(#EEEAF5, #2C2840);
+
+  /* Gráficos */
+  --grafico-1: light-dark(#008F7E, #22A08F);
+  --grafico-alerta: light-dark(#B4412F, #D45C46);
+
+  /* Radios: pequeño (insignias), medio (controles), grande (paneles) */
+  --radio-s: 4px;
+  --radio-m: 8px;
+  --radio-l: 14px;
+
+  /* Tipografía */
+  --fuente: 'Archivo Variable', 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Profundidad (una sombra no es un color: light-dark() no aplica, ver abajo) */
+  --sombra-panel: 0 1px 2px rgba(31, 42, 48, .06), 0 8px 24px rgba(31, 42, 48, .07);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --sombra-panel: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25); }
+}
+:root[data-theme="dark"] { color-scheme: dark; --sombra-panel: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25); }
+:root[data-theme="light"] { color-scheme: light; }

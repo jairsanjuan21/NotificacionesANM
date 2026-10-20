@@ -1,18 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
-const ContextoAvisos = createContext(null);
-const ContextoConfirmar = createContext(null);
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useAvisos = () => useContext(ContextoAvisos);
-// eslint-disable-next-line react-refresh/only-export-components
-export const useConfirmar = () => useContext(ContextoConfirmar);
+import Modal from '../componentes/Modal';
+import { ContextoAvisos, ContextoConfirmar } from './avisos';
 
 let contador = 0;
 
-export function ProveedorAvisos({ children }) {
+/**
+ * Provee dos servicios globales:
+ *  - avisos (toasts): avisos.exito('…'), avisos.error('…'), avisos.info('…', 0)
+ *  - confirmar: `if (await confirmar({ titulo, mensaje, peligro: true })) …`
+ */
+export default function ProveedorAvisos({ children }) {
   const [avisos, setAvisos] = useState([]);
   const [confirmacion, setConfirmacion] = useState(null);
 
@@ -25,7 +25,7 @@ export function ProveedorAvisos({ children }) {
     return id;
   }, [quitar]);
 
-  const api = useMemo(() => ({
+  const servicio = useMemo(() => ({
     exito: (t, d) => avisar(t, 'exito', d),
     error: (t, d = 8000) => avisar(t, 'error', d),
     info: (t, d) => avisar(t, 'info', d),
@@ -42,7 +42,7 @@ export function ProveedorAvisos({ children }) {
   };
 
   return (
-    <ContextoAvisos.Provider value={api}>
+    <ContextoAvisos.Provider value={servicio}>
       <ContextoConfirmar.Provider value={confirmar}>
         {children}
         {createPortal(
@@ -71,30 +71,5 @@ export function ProveedorAvisos({ children }) {
         )}
       </ContextoConfirmar.Provider>
     </ContextoAvisos.Provider>
-  );
-}
-
-export function Modal({ titulo, children, pie, onCerrar, ancho }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const tecla = (e) => { if (e.key === 'Escape') onCerrar?.(); };
-    document.addEventListener('keydown', tecla);
-    const anterior = document.activeElement;
-    ref.current?.querySelector('input, textarea, select, button[autofocus]')?.focus();
-    return () => { document.removeEventListener('keydown', tecla); anterior?.focus?.(); };
-  }, [onCerrar]);
-
-  return createPortal(
-    <div className="modal-velo" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar?.(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={titulo} ref={ref} style={ancho ? { width: `min(${ancho}px, 100%)` } : undefined}>
-        <div className="modal-cabecera">
-          <h2>{titulo}</h2>
-          <button className="boton-icono" onClick={onCerrar} aria-label="Cerrar"><X size={18} /></button>
-        </div>
-        <div className="modal-cuerpo">{children}</div>
-        {pie && <div className="modal-pie">{pie}</div>}
-      </div>
-    </div>,
-    document.body,
   );
 }

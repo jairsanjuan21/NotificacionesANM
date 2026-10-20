@@ -1,13 +1,15 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Upload, Search, Pencil, Trash2, X, Download, FileSpreadsheet, Mail, Mountain } from 'lucide-react';
-import api, { API_BASE, mensajeError } from '../api';
-import { useDatos } from '../datos';
-import { useAvisos, useConfirmar, Modal } from '../ui/Avisos';
-import { InsigniaEstado } from '../ui/Insignias';
-import { BarraSuperior, BotonConsultar } from './Marco';
-import Cajon from './Cajon';
-import { REGIONALES, etiquetaRegional, listaRegionales, respondida, tiempoDe, fechaCorta, tituloActo, textoRestante, nivelPlazo } from '../util';
+import api, { API_BASE, mensajeError } from '../servicios/api';
+import { useDatos } from '../contexto/datos';
+import { useAvisos, useConfirmar } from '../contexto/avisos';
+import Modal from '../componentes/Modal';
+import { InsigniaEstado } from '../componentes/Insignias';
+import BarraSuperior from '../componentes/BarraSuperior';
+import BotonConsultar from '../componentes/BotonConsultar';
+import Cajon from '../componentes/Cajon';
+import { REGIONALES, etiquetaRegional, listaRegionales, respondida, tiempoDe, fechaCorta, tituloActo, textoRestante, nivelPlazo } from '../utilidades';
 
 export default function Titulos() {
   const { clientes, notificaciones, recargar } = useDatos();

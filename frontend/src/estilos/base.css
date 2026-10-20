@@ -1,0 +1,46 @@
+/* Base */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--fuente);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--tinta);
+  background: var(--roca);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: 650; letter-spacing: -0.005em; }
+h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.015em; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+p { margin: 0; }
+a { color: var(--verdin); text-underline-offset: 2px; }
+button { font: inherit; color: inherit; }
+input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible { outline: 2px solid var(--verdin); outline-offset: 2px; border-radius: 3px; }
+
+.num { font-variant-numeric: tabular-nums; }
+.tenue { color: var(--tinta-3); }
+.secundario-texto { color: var(--tinta-2); }
+.pequeno { font-size: 13px; }
+.muy-pequeno { font-size: 12px; }
+.oculto-visual { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* El código de placa: condensado y firme, como el rótulo de una estaca topográfica */
+.placa {
+  font-stretch: 72%;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

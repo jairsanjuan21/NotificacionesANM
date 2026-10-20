@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { RefreshCw, Loader2, KeyRound, Search } from 'lucide-react';
-import api, { mensajeError } from '../../api';
-import { ConsolaLogs } from './Logs';
-import { fechaHora } from '../../util';
+import api, { mensajeError } from '../../servicios/api';
+import ConsolaLogs from '../../componentes/ConsolaLogs';
+import useConsulta from '../../hooks/useConsulta';
+import { fechaHora, nivelDe } from '../../utilidades';
 
 const ESTADOS = {
   SUCCESS: { texto: 'Activo', clase: 'ok' }, BUILDING: { texto: 'Construyendo', clase: 'curso' },
@@ -12,56 +13,43 @@ const ESTADOS = {
   SLEEPING: { texto: 'Dormido', clase: 'alerta' }, SKIPPED: { texto: 'Omitido', clase: '' },
 };
 
-const nivelDe = (sev) => {
-  const s = (sev || '').toLowerCase();
-  if (s.includes('err')) return 'error';
-  if (s.includes('warn')) return 'aviso';
-  return 'info';
-};
+const consultarEstado = () => api.get('/admin/railway/estado').then(r => r.data).catch(() => ({}));
 
 export default function Railway() {
-  const [estado, setEstado] = useState(null);
-  const [deploys, setDeploys] = useState(null);
-  const [errorDeploys, setErrorDeploys] = useState(null);
-  const [elegido, setElegido] = useState(null);
+  const [seleccion, setElegido] = useState(null);
   const [tipo, setTipo] = useState('deploy');
   const [filtro, setFiltro] = useState('');
   const [filtroAplicado, setFiltroAplicado] = useState('');
-  const [logs, setLogs] = useState(null);
-  const [cargando, setCargando] = useState(false);
-  const [errorLogs, setErrorLogs] = useState(null);
 
-  useEffect(() => { api.get('/admin/railway/estado').then(r => setEstado(r.data)).catch(() => setEstado({})); }, []);
+  // 1) ¿Hay token y estamos en Railway?
+  const { datos: estado } = useConsulta('railway-estado', consultarEstado);
+  const conectado = Boolean(estado?.token_configurado && estado?.en_railway);
 
-  const cargarDeploys = useCallback(async () => {
-    try {
-      const r = await api.get('/admin/railway/deployments', { params: { cantidad: 12 } });
-      setDeploys(r.data);
-      setErrorDeploys(null);
-      setElegido(e => e || r.data.find(d => d.actual)?.id || r.data[0]?.id || null);
-    } catch (e) {
-      setErrorDeploys(mensajeError(e));
-    }
-  }, []);
+  // 2) Deployments (solo si hay conexión)
+  const deploysQ = useConsulta(
+    'railway-deploys',
+    () => api.get('/admin/railway/deployments', { params: { cantidad: 12 } }).then(r => r.data),
+    { activo: conectado },
+  );
+  const deploys = deploysQ.datos;
+  const errorDeploys = deploysQ.error && mensajeError(deploysQ.error);
+  const cargarDeploys = deploysQ.recargar;
 
-  useEffect(() => { if (estado?.token_configurado && estado?.en_railway) cargarDeploys(); }, [estado, cargarDeploys]);
+  // El elegido por el usuario o, por defecto, el deployment en uso. Es un valor
+  // derivado: no hace falta un efecto que lo "inicialice" cuando llegan los datos.
+  const elegido = seleccion ?? deploys?.find(d => d.actual)?.id ?? deploys?.[0]?.id ?? null;
 
-  const cargarLogs = useCallback(async () => {
-    if (!elegido) return;
-    setCargando(true);
-    try {
-      const r = await api.get('/admin/railway/logs', { params: { deployment_id: elegido, tipo, limite: 800, filtro: filtroAplicado || undefined } });
-      setLogs(r.data.map((l, i) => ({ id: i, ts: l.timestamp, nivel: nivelDe(l.severity), texto: l.message })));
-      setErrorLogs(null);
-    } catch (e) {
-      setErrorLogs(mensajeError(e));
-      setLogs([]);
-    } finally {
-      setCargando(false);
-    }
-  }, [elegido, tipo, filtroAplicado]);
-
-  useEffect(() => { cargarLogs(); }, [cargarLogs]);
+  // 3) Logs del deployment elegido: la clave cambia con deployment, tipo o filtro
+  const logsQ = useConsulta(
+    `railway-logs|${elegido}|${tipo}|${filtroAplicado}`,
+    () => api.get('/admin/railway/logs', { params: { deployment_id: elegido, tipo, limite: 800, filtro: filtroAplicado || undefined } })
+      .then(r => r.data.map((l, i) => ({ id: i, ts: l.timestamp, nivel: nivelDe(l.severity), texto: l.message }))),
+    { activo: Boolean(elegido) },
+  );
+  const cargando = logsQ.cargando;
+  const errorLogs = logsQ.error && mensajeError(logsQ.error);
+  const logs = logsQ.error ? [] : logsQ.datos;
+  const cargarLogs = logsQ.recargar;
 
   if (!estado) return <div className="cargando"><Loader2 size={18} className="girando" /> Consultando configuración…</div>;
 

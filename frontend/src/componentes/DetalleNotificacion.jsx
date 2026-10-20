@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { X, Sparkles, ExternalLink, FileText, Trash2, Save, Loader2 } from 'lucide-react';
-import api, { API_BASE, mensajeError } from '../api';
-import { useDatos } from '../datos';
-import { useAvisos, useConfirmar } from '../ui/Avisos';
-import { InsigniaUrgencia, InsigniaEstado, InsigniaCoactivo } from '../ui/Insignias';
-import { ESTADOS, fechaLarga, fechaCorta, fechaHora, nivelPlazo, textoRestante, tituloActo, nombreDocumento, listaRegionales, etiquetaRegional } from '../util';
+import api, { API_BASE, mensajeError } from '../servicios/api';
+import { useDatos } from '../contexto/datos';
+import { useAvisos, useConfirmar } from '../contexto/avisos';
+import { InsigniaUrgencia, InsigniaEstado, InsigniaCoactivo } from './Insignias';
+import { ESTADOS, fechaLarga, fechaCorta, fechaHora, nivelPlazo, textoRestante, tituloActo, nombreDocumento, listaRegionales, etiquetaRegional } from '../utilidades';
 
+/**
+ * Panel con el detalle de una notificación.
+ * Quien lo use debe pasarle key={notif.id_notificacion}: al cambiar de notificación
+ * React crea un componente nuevo y el estado local (notas) se reinicia solo,
+ * sin necesidad de un useEffect que lo sincronice.
+ */
 export default function Detalle({ notif, onCerrar }) {
   const { clientePorId, actualizarNotificacion, recargar } = useDatos();
   const avisos = useAvisos();
@@ -13,8 +19,6 @@ export default function Detalle({ notif, onCerrar }) {
   const cliente = clientePorId(notif.id_cliente) || {};
   const [notas, setNotas] = useState(notif.notas || '');
   const [guardando, setGuardando] = useState(null);
-
-  useEffect(() => { setNotas(notif.notas || ''); }, [notif.id_notificacion, notif.notas]);
 
   useEffect(() => {
     const tecla = (e) => {

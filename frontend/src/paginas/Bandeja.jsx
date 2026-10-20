@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, ArrowUpDown, Inbox } from 'lucide-react';
-import api, { mensajeError } from '../api';
-import { useDatos } from '../datos';
-import { useAvisos, useConfirmar } from '../ui/Avisos';
-import { InsigniaEstado, Plazo } from '../ui/Insignias';
-import { BarraSuperior, FiltroFecha, BotonConsultar } from './Marco';
-import Detalle from './Detalle';
-import Cajon, { usePantallaAncha } from './Cajon';
+import api, { mensajeError } from '../servicios/api';
+import { useDatos } from '../contexto/datos';
+import { useAvisos, useConfirmar } from '../contexto/avisos';
+import { InsigniaEstado, Plazo } from '../componentes/Insignias';
+import BarraSuperior from '../componentes/BarraSuperior';
+import FiltroFecha from '../componentes/FiltroFecha';
+import BotonConsultar from '../componentes/BotonConsultar';
+import Detalle from '../componentes/DetalleNotificacion';
+import Cajon from '../componentes/Cajon';
+import usePantallaAncha from '../hooks/usePantallaAncha';
 import {
   REGIONALES, URGENCIAS, listaRegionales, prioridad, requiereAtencion, respondida,
   tiempoDe, fechaCorta, diaSemana, tituloActo, textoRestante,
-} from '../util';
+} from '../utilidades';
 
 const FILTROS = [
   { id: 'atencion', texto: 'Requieren atención', prueba: requiereAtencion },
@@ -44,7 +47,13 @@ export default function Bandeja() {
   const [busqueda, setBusqueda] = useState('');
   const [regional, setRegional] = useState('');
   const [orden, setOrden] = useState('prioridad');
-  const [mostrar, setMostrar] = useState(POR_PAGINA);
+  // Paginación que vuelve a la primera página cuando cambia cualquier filtro.
+  // En vez de un useEffect que llame setMostrar(POR_PAGINA), guardamos junto al
+  // número la "firma" de los filtros con que se calculó; si no coincide, se descarta.
+  const firmaFiltros = [filtro, busqueda, regional, orden, fechaDesde].join('|');
+  const [pagina, setPagina] = useState({ firma: firmaFiltros, mostrar: POR_PAGINA });
+  const mostrar = pagina.firma === firmaFiltros ? pagina.mostrar : POR_PAGINA;
+  const setMostrar = (fn) => setPagina({ firma: firmaFiltros, mostrar: fn(mostrar) });
   const ancha = usePantallaAncha();
   const listaRef = useRef(null);
 
@@ -69,8 +78,6 @@ export default function Bandeja() {
     const prueba = FILTROS.find(f => f.id === filtro)?.prueba || (() => true);
     return { visibles: base.filter(prueba).sort(ORDENES[orden].fn), cuentas };
   }, [enPeriodo, clientePorId, busqueda, regional, filtro, orden]);
-
-  useEffect(() => { setMostrar(POR_PAGINA); }, [filtro, busqueda, regional, orden, fechaDesde]);
 
   const seleccionada = notificaciones.find(n => n.id_notificacion === seleccion) || null;
 

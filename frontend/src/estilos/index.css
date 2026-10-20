@@ -1,0 +1,22 @@
+/*
+ * Hoja de estilos principal: solo importa los módulos, en orden de cascada.
+ *   tokens → base → layout → componentes → páginas
+ * Lo que va después puede sobrescribir a lo anterior, nunca al revés.
+ */
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+
+/* Componentes reutilizables */
+@import './controles.css';
+@import './insignias.css';
+@import './detalle.css';
+@import './tablas.css';
+@import './modal.css';
+@import './avisos.css';
+
+/* Específico de cada página */
+@import './paginas/bandeja.css';
+@import './paginas/agenda.css';
+@import './paginas/login.css';
+@import './paginas/admin.css';

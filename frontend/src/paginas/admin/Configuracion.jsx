@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { CheckCircle2, CircleDashed, XCircle, Loader2 } from 'lucide-react';
-import api, { mensajeError } from '../../api';
+import api, { mensajeError } from '../../servicios/api';
+import useConsulta from '../../hooks/useConsulta';
 
 function Fila({ estado, titulo, children }) {
   const Icono = estado === 'ok' ? CheckCircle2 : estado === 'mal' ? XCircle : CircleDashed;
@@ -14,15 +14,11 @@ function Fila({ estado, titulo, children }) {
 }
 
 export default function Configuracion() {
-  const [diag, setDiag] = useState(null);
-  const [railway, setRailway] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
+  const { datos, error: fallo } = useConsulta('configuracion', () =>
     Promise.all([api.get('/correo/diagnostico'), api.get('/admin/railway/estado')])
-      .then(([a, b]) => { setDiag(a.data); setRailway(b.data); })
-      .catch(e => setError(mensajeError(e)));
-  }, []);
+      .then(([a, b]) => ({ diag: a.data, railway: b.data })));
+  const { diag, railway } = datos || {};
+  const error = fallo && mensajeError(fallo);
 
   if (error) return <div className="vacio"><h3>No se pudo leer la configuración</h3><p>{error}</p></div>;
   if (!diag) return <div className="cargando"><Loader2 size={18} className="girando" /> Leyendo configuración…</div>;

@@ -1,0 +1,25 @@
+/* Agenda */
+
+.agenda { display: grid; gap: 22px; }
+.agenda-grupo h2 { font-size: 17px; margin-bottom: 10px; display: flex; gap: 10px; align-items: baseline; }
+.agenda-grupo h2 .cuenta { color: var(--tinta-3); font-weight: 500; font-size: 14px; }
+.agenda-items { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio-l); overflow: hidden; }
+.agenda-item {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: 16px; align-items: center;
+  width: 100%; padding: 12px 16px;
+  border: 0; border-bottom: 1px solid var(--linea-suave);
+  background: none; text-align: left; cursor: pointer;
+}
+.agenda-item:last-child { border-bottom: 0; }
+.agenda-item:hover { background: var(--superficie-2); }
+.dia-calendario { text-align: center; line-height: 1.05; padding: 6px 0; border-radius: var(--radio-m); background: var(--superficie-2); }
+.dia-calendario .dia-num { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; display: block; }
+.dia-calendario .dia-mes { font-size: 12px; color: var(--tinta-3); }
+.dia-calendario.critico { background: var(--oxido-suave); color: var(--oxido); }
+.dia-calendario.cerca { background: var(--ocre-suave); color: var(--ocre); }
+.agenda-item .que { min-width: 0; }
+.agenda-item .que .linea1 { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.agenda-item .que .linea1 .placa { font-size: 16px; }
+.agenda-item .que .linea2 { font-size: 13px; color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

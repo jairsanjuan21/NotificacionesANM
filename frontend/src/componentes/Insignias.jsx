@@ -1,5 +1,5 @@
 import { AlertTriangle, Eye, CircleDot, ArrowDown, CheckCheck, Clock3, Circle, Wrench, Banknote } from 'lucide-react';
-import { URGENCIAS, etiquetaEstado, nivelPlazo, textoRestante, fechaCorta } from '../util';
+import { URGENCIAS, etiquetaEstado, nivelPlazo, textoRestante, fechaCorta } from '../utilidades';
 
 const ICONO_URGENCIA = { alta: AlertTriangle, revisar: Eye, media: CircleDot, baja: ArrowDown };
 const ICONO_ESTADO = { nueva: Circle, revisada: Eye, en_tramite: Wrench, respondida: CheckCheck };

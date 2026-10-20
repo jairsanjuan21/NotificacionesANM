@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { CalendarCheck } from 'lucide-react';
-import { useDatos } from '../datos';
-import { InsigniaUrgencia, InsigniaEstado } from '../ui/Insignias';
-import { BarraSuperior, FiltroFecha } from './Marco';
-import Detalle from './Detalle';
-import Cajon from './Cajon';
-import { aFecha, mesCorto, nivelPlazo, respondida, textoRestante, tiempoDe, tituloActo } from '../util';
+import { useDatos } from '../contexto/datos';
+import { InsigniaUrgencia, InsigniaEstado } from '../componentes/Insignias';
+import BarraSuperior from '../componentes/BarraSuperior';
+import FiltroFecha from '../componentes/FiltroFecha';
+import Detalle from '../componentes/DetalleNotificacion';
+import Cajon from '../componentes/Cajon';
+import { aFecha, mesCorto, nivelPlazo, respondida, textoRestante, tiempoDe, tituloActo } from '../utilidades';
 
 function grupoDe(n, hoy) {
   const d = n.dias_habiles_restantes;

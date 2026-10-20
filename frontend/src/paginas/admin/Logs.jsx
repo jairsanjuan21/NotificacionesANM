@@ -1,36 +1,10 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Download, Pause, Play, ArrowDownToLine } from 'lucide-react';
-import api, { mensajeError } from '../../api';
+import api, { mensajeError } from '../../servicios/api';
+import ConsolaLogs from '../../componentes/ConsolaLogs';
+import { esPeticionNormal } from '../../utilidades';
 
 const MAX_LINEAS = 4000;
-
-// Peticiones HTTP correctas del panel (mucho ruido); las que fallan con 5xx se muestran siempre
-const esPeticionNormal = (l) => /"(GET|POST|PUT|DELETE|HEAD|OPTIONS) \/[^"]*" [1-4]\d\d\b/.test(l.texto);
-
-export function resaltar(texto, busqueda) {
-  if (!busqueda) return texto;
-  const partes = texto.split(new RegExp(`(${busqueda.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig'));
-  return partes.map((p, i) => (i % 2 ? <mark key={i}>{p}</mark> : <Fragment key={i}>{p}</Fragment>));
-}
-
-export function horaLocal(iso) {
-  const d = new Date(iso);
-  if (isNaN(d)) return iso || '';
-  return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-}
-
-export function ConsolaLogs({ lineas, busqueda, vacio, contenedorRef, onScroll }) {
-  return (
-    <div className="consola" ref={contenedorRef} onScroll={onScroll} role="log" aria-live="off">
-      {lineas.length === 0 ? <div className="vacia">{vacio}</div> : lineas.map((l, i) => (
-        <div key={l.id ?? i} className={`linea-log ${l.nivel === 'error' ? 'error' : l.nivel === 'aviso' ? 'aviso-log' : ''}`}>
-          <span className="hora">{horaLocal(l.ts)}</span>
-          <span>{resaltar(l.texto, busqueda)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function Logs() {
   const [lineas, setLineas] = useState([]);

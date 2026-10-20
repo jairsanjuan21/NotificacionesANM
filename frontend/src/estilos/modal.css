@@ -1,0 +1,36 @@
+/* Modal */
+
+.modal-velo {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgba(16, 22, 26, .5);
+  animation: aparecer .15s ease-out;
+}
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--superficie);
+  border-radius: var(--radio-l);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .3);
+}
+.modal-cabecera { display: flex; align-items: center; gap: 10px; padding: 18px 20px 6px; }
+.modal-cabecera h2 { font-size: 19px; }
+.modal-cabecera .boton-icono { margin-left: auto; }
+.modal-cuerpo { padding: 10px 20px 4px; display: grid; gap: 16px; }
+.modal-cuerpo p { color: var(--tinta-2); }
+.modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 20px 20px; }
+.rejilla-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 560px) { .rejilla-2 { grid-template-columns: 1fr; } }
+
+.zona-archivo {
+  display: grid; place-items: center; gap: 8px;
+  padding: 28px 16px;
+  border: 2px dashed var(--linea);
+  border-radius: var(--radio-l);
+  background: var(--superficie-2);
+  text-align: center; cursor: pointer;
+  color: var(--tinta-2);
+}
+.zona-archivo:hover, .zona-archivo.activa { border-color: var(--verdin); background: var(--verdin-suave); }
