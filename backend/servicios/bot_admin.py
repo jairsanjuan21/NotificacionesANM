@@ -23,7 +23,7 @@ from html import escape
 import pytz
 
 from database import database, models
-from servicios import contexto_app, registro
+from servicios import contexto_app, healthchecks, registro
 from servicios.telegram import botones_inline, notificar_admin
 from servicios.telegram_bot import Contexto, callback, comando, estado_webhooks
 
@@ -156,6 +156,9 @@ def cmd_estado(ctx: Contexto):
             error = f" · ⚠️ {escape(info['ultimo_error'])}" if info.get("ultimo_error") else ""
             lineas.append(f"{canal}: {'✅' if info['activo'] else '❌'} {info['pendientes']} pendientes{error}")
     partes.append("<b>Telegram</b>\n" + "\n".join(lineas))
+
+    hc = healthchecks.estado()
+    partes.append("<b>healthchecks.io</b>\n" + " · ".join(f"{'✅' if v else '—'} {k}" for k, v in hc.items()))
 
     ctx.responder("\n\n".join(partes))
 
