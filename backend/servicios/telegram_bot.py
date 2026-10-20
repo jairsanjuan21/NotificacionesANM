@@ -296,3 +296,8 @@ def estado_webhooks() -> dict:
             "ultimo_error": info.get("last_error_message"),
         }
     return salida
+
+
+# ============================================================================ carga de los comandos de cada bot
+# Va al final a propósito: esos módulos importan los decoradores definidos arriba.
+from servicios import bot_cliente  # noqa: E402,F401

@@ -47,6 +47,7 @@ class Notificacion(Base):
     termino_dias = Column(Integer, nullable=True)         # "término de (30) días" detectado en el acto
     resumen = Column(Text, nullable=True)                 # Resumen IA (opcional)
     archivo_local = Column(String, nullable=True)         # Ruta de la copia archivada del PDF
+    telegram_file_id = Column(String, nullable=True)      # PDF ya subido al bot del cliente (reenvío instantáneo)
 
     # Plazos
     fecha_surtida = Column(Date, nullable=True)           # Fecha estimada en que queda notificada
