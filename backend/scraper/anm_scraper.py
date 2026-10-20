@@ -292,20 +292,32 @@ def consultar_coactivo(ctx: Contexto, clientes, campos: dict):
 
 # ======================================================================= Barrido principal
 
-def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", esperar: bool = False) -> int:
+def _reservar_barrido(origen: str, esperar: bool, id_cliente: int = None) -> int:
     """
-    Ejecuta un barrido completo. Devuelve el número de notificaciones nuevas.
-    origen: 'manual' (botón) o 'automatico' (cron). Si `esperar` es False y hay
-    otro barrido en curso, lanza BarridoEnCurso.
+    Toma el candado y registra la ejecución como 'en_curso'. Devuelve su id.
+    Separado del trabajo pesado para que la API pueda responder de inmediato con el id.
+    Quien llame queda a cargo de ejecutar `_ejecutar_barrido`, que es quien libera el candado.
     """
     if not LOCK_BARRIDO.acquire(blocking=esperar, timeout=1800 if esperar else -1):
         raise BarridoEnCurso("Ya hay un barrido en curso. Intente de nuevo en unos minutos.")
+    db: Session = SessionLocal()
+    try:
+        ejec = Ejecucion(inicio=datetime.utcnow(), origen=origen, estado="en_curso", id_cliente=id_cliente)
+        db.add(ejec)
+        db.commit()
+        return ejec.id_ejecucion
+    except Exception:
+        LOCK_BARRIDO.release()
+        raise
+    finally:
+        db.close()
 
+
+def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None) -> int:
+    """Hace el barrido de una ejecución ya reservada. Siempre libera el candado al terminar."""
     print("Iniciando motor de extracción ANM (Avisos + Cobro coactivo)...")
     db: Session = SessionLocal()
-    ejec = Ejecucion(inicio=datetime.utcnow(), origen=origen, estado="en_curso")
-    db.add(ejec)
-    db.commit()
+    ejec = db.get(Ejecucion, id_ejecucion)
     ctx = Contexto(db)
 
     try:
@@ -317,8 +329,6 @@ def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", 
 
         if not clientes:
             print("[!] No se encontraron clientes activos para procesar.")
-            ejec.estado, ejec.fin = "ok", datetime.utcnow()
-            db.commit()
             return 0
 
         for cliente in clientes:
@@ -373,6 +383,77 @@ def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", 
         finally:
             db.close()
             LOCK_BARRIDO.release()
+
+
+def ejecutar_scraper(id_cliente_especifico: int = None, origen: str = "manual", esperar: bool = False) -> int:
+    """
+    Barrido SÍNCRONO (lo usa el cron). Devuelve el número de notificaciones nuevas.
+    Si `esperar` es False y hay otro barrido en curso, lanza BarridoEnCurso.
+    """
+    id_ejecucion = _reservar_barrido(origen, esperar, id_cliente_especifico)
+    return _ejecutar_barrido(id_ejecucion, id_cliente_especifico)
+
+
+def iniciar_barrido_en_segundo_plano(id_cliente_especifico: int = None, origen: str = "manual") -> int:
+    """
+    Barrido ASÍNCRONO (lo usa el botón del panel). Reserva la ejecución, lanza el
+    trabajo en un hilo y devuelve el id de inmediato para que el cliente consulte el avance.
+    """
+    id_ejecucion = _reservar_barrido(origen, esperar=False, id_cliente=id_cliente_especifico)
+
+    def tarea():
+        try:
+            _ejecutar_barrido(id_ejecucion, id_cliente_especifico)
+        except Exception as e:
+            # El error ya quedó registrado en la ejecución; aquí solo evitamos que el hilo muera en silencio
+            print(f"[BARRIDO {id_ejecucion}] Terminó con error: {e}")
+
+    try:
+        threading.Thread(target=tarea, daemon=True, name=f"barrido-{id_ejecucion}").start()
+    except Exception:
+        # Si el hilo ni siquiera arrancó, no dejar el candado tomado ni la ejecución colgada
+        _marcar_fallida(id_ejecucion, "No se pudo iniciar el hilo del barrido.")
+        LOCK_BARRIDO.release()
+        raise
+    return id_ejecucion
+
+
+def barrido_en_curso():
+    """Devuelve la ejecución que está corriendo ahora (o None)."""
+    db: Session = SessionLocal()
+    try:
+        return (db.query(Ejecucion).filter(Ejecucion.estado == "en_curso")
+                .order_by(Ejecucion.inicio.desc()).first())
+    finally:
+        db.close()
+
+
+def _marcar_fallida(id_ejecucion: int, motivo: str):
+    db: Session = SessionLocal()
+    try:
+        ejec = db.get(Ejecucion, id_ejecucion)
+        if ejec:
+            ejec.estado, ejec.fin, ejec.alertas = "fallida", datetime.utcnow(), motivo
+            db.commit()
+    finally:
+        db.close()
+
+
+def cerrar_barridos_huerfanos() -> int:
+    """
+    Al arrancar el servidor no puede haber ningún barrido corriendo: si quedó alguno
+    'en_curso' es porque un reinicio o deploy lo cortó a la mitad. Se marca como fallido.
+    """
+    db: Session = SessionLocal()
+    try:
+        huerfanos = db.query(Ejecucion).filter(Ejecucion.estado == "en_curso").all()
+        for e in huerfanos:
+            e.estado, e.fin = "fallida", e.fin or datetime.utcnow()
+            e.alertas = "Interrumpido: el servidor se reinició mientras el barrido estaba en curso."
+        db.commit()
+        return len(huerfanos)
+    finally:
+        db.close()
 
 
 # ======================================================================= Procesar el histórico

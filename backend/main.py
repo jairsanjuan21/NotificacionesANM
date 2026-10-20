@@ -21,7 +21,7 @@ from database import models, database
 from database.migraciones import migrar
 from api import routes, auth_routes, admin_routes
 from servicios import auth
-from scraper.anm_scraper import ejecutar_scraper
+from scraper.anm_scraper import ejecutar_scraper, cerrar_barridos_huerfanos
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
 
 # Crear tablas y agregar columnas nuevas sin perder datos
@@ -83,6 +83,11 @@ def tarea_vigilante():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- AL INICIAR EL SERVIDOR ---
+    # 0. Un barrido que quedó 'en_curso' fue cortado por un reinicio o deploy
+    huerfanos = cerrar_barridos_huerfanos()
+    if huerfanos:
+        print(f"[BARRIDO] {huerfanos} barrido(s) interrumpido(s) por el reinicio quedaron como fallidos.")
+
     # 1. Regla Lunes a Viernes: 8:30 AM y 5:30 PM (17:30)
     scheduler.add_job(
         tarea_programada_scraper,

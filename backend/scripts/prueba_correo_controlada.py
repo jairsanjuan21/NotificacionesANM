@@ -6,7 +6,8 @@ from email.mime.multipart import MIMEMultipart
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+# Agregar la raíz de 'backend' al path para poder importar database, servicios, etc.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.database import SessionLocal
 from database.models import Cliente, Notificacion

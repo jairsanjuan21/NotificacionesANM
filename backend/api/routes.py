@@ -6,13 +6,14 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from api import schemas
 from database import database, models
 from mailer.dispatcher import enviar_alertas_pendientes, enviar_correo, enviar_recordatorios
-from scraper.anm_scraper import (BarridoEnCurso, ejecutar_scraper, procesar_historico,
+from scraper.anm_scraper import (BarridoEnCurso, barrido_en_curso, iniciar_barrido_en_segundo_plano,
+                                 procesar_historico,
                                  REGIONALES_ANM, URL_BASE, URL_COACTIVO, descubrir_formulario)
 from servicios.analizador import normalizar
 from servicios.telegram import enviar_telegram, telegram_configurado
@@ -291,15 +292,39 @@ def reenviar_pendientes(db: Session = Depends(database.get_db)):
 
 # ============================================================ BARRIDOS
 
-@router.post("/scraper/ejecutar")
-def disparar_scraper(id_cliente: Optional[int] = None):
+@router.post("/scraper/ejecutar", status_code=202)
+def disparar_scraper(id_cliente: Optional[int] = None, db: Session = Depends(database.get_db)):
+    """
+    Lanza un barrido en segundo plano y responde de inmediato (202 Accepted) con el id
+    de la ejecución. El avance se consulta en GET /scraper/ejecuciones/{id}.
+    """
+    if id_cliente is not None and db.get(models.Cliente, id_cliente) is None:
+        raise HTTPException(status_code=404, detail="Título minero no encontrado.")
     try:
-        nuevas = ejecutar_scraper(id_cliente_especifico=id_cliente, origen="manual")
-        return {"estado": "completado", "nuevas_notificaciones": nuevas or 0}
+        id_ejecucion = iniciar_barrido_en_segundo_plano(id_cliente_especifico=id_cliente, origen="manual")
     except BarridoEnCurso as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        # Se devuelve el id del barrido que ya corre para que el panel pueda seguirlo en vez de fallar
+        actual = barrido_en_curso()
+        return JSONResponse(status_code=409, content={
+            "detail": str(e), "id_ejecucion": actual.id_ejecucion if actual else None})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Fallo en el scraper: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"No se pudo iniciar el barrido: {e}")
+    return {"id_ejecucion": id_ejecucion, "estado": "en_curso"}
+
+
+@router.get("/scraper/estado", response_model=Optional[schemas.EjecucionResponse])
+def estado_barrido_actual():
+    """El barrido que está corriendo ahora (manual o del cron), o null si no hay ninguno."""
+    return barrido_en_curso()
+
+
+@router.get("/scraper/ejecuciones/{id_ejecucion}", response_model=schemas.EjecucionResponse)
+def estado_de_ejecucion(id_ejecucion: int, db: Session = Depends(database.get_db)):
+    """Avance de un barrido. Ruta abierta al usuario del panel (a diferencia de /ejecuciones)."""
+    ejec = db.get(models.Ejecucion, id_ejecucion)
+    if ejec is None:
+        raise HTTPException(status_code=404, detail="Ejecución no encontrada.")
+    return ejec
 
 
 @router.get("/ejecuciones", response_model=List[schemas.EjecucionResponse])
