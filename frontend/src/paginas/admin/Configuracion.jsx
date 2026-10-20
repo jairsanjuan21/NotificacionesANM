@@ -45,8 +45,11 @@ export default function Configuracion() {
         <Fila estado={diag.resumen_ia_gemini ? 'ok' : 'no'} titulo="Resúmenes con IA">
           {diag.resumen_ia_gemini ? 'Gemini activo (capa gratuita).' : <>Opcional: <code>GEMINI_API_KEY</code> de Google AI Studio.</>}
         </Fila>
-        <Fila estado={diag.telegram ? 'ok' : 'no'} titulo="Alertas por Telegram">
-          {diag.telegram ? 'Configurado.' : <>Opcional: <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_CHAT_ID</code>.</>}
+        <Fila estado={diag.telegram_canales?.cliente ? 'ok' : 'no'} titulo="Telegram: bot del cliente">
+          {diag.telegram_canales?.cliente ? 'Configurado.' : <>Opcional: <code>TG_CLIENTE_TOKEN</code> y <code>TG_CLIENTE_CHATS</code>.</>}
+        </Fila>
+        <Fila estado={diag.telegram_canales?.admin ? 'ok' : 'no'} titulo="Telegram: bot del administrador">
+          {diag.telegram_canales?.admin ? 'Configurado.' : <>Opcional: <code>TG_ADMIN_TOKEN</code> y <code>TG_ADMIN_CHAT</code>.</>}
         </Fila>
         <Fila estado={railway?.token_configurado ? 'ok' : 'no'} titulo="Logs de Railway">
           {railway?.token_configurado ? 'Token configurado.' : <>Opcional: <code>RAILWAY_API_TOKEN</code> (token de proyecto).</>}

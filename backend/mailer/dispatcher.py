@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from database.models import Cliente, Notificacion
 from servicios import plazos
-from servicios.telegram import enviar_telegram
+from servicios.telegram import notificar_admin, notificar_cliente
 
 load_dotenv()
 
@@ -216,7 +216,7 @@ def enviar_alertas_pendientes(db: Session):
             copias_error += 1
             print(f"[DISPATCHER] No se pudo enviar copia a {c.placa}: {e}")
 
-    enviar_telegram(f"🔔 <b>{len(pendientes)} nueva(s) notificación(es) ANM</b>"
+    notificar_cliente(f"🔔 <b>{len(pendientes)} nueva(s) notificación(es) ANM</b>"
                     + (f" — {altas} urgentes" if altas else "") + "\n\n"
                     + "\n".join(_linea_telegram(n) for n in pendientes[:30]))
 
@@ -264,7 +264,7 @@ def enviar_recordatorios(db: Session):
         n.recordatorios_enviados = ",".join(sorted(ya, key=int, reverse=True))
     db.commit()
 
-    enviar_telegram(f"⏰ <b>{len(notifs)} notificación(es) por vencer</b>\n\n"
+    notificar_cliente(f"⏰ <b>{len(notifs)} notificación(es) por vencer</b>\n\n"
                     + "\n".join(_linea_telegram(n) for n in notifs[:30]))
     return {"recordatorios": len(notifs)}
 
@@ -282,7 +282,7 @@ def enviar_alerta_sistema(asunto: str, detalle: str):
                       _plantilla("Alerta del sistema de monitoreo", "Aviso automático de salud", contenido))
     except Exception as e:
         print(f"[ALERTA SISTEMA] No se pudo enviar el correo de alerta: {e}")
-    enviar_telegram(f"⚠️ <b>Sistema ANM: {escape(asunto)}</b>\n{escape(detalle[:1500])}")
+    notificar_admin(f"⚠️ <b>Sistema ANM: {escape(asunto)}</b>\n{escape(detalle[:1500])}")
 
 
 # Alias de compatibilidad
