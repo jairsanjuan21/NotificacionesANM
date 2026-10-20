@@ -24,7 +24,8 @@ PREFIJOS_ADMIN = (
     "/api/salud", "/api/mantenimiento", "/api/recordatorios", "/api/notificaciones/enviar-pendientes",
     "/docs", "/redoc", "/openapi.json",
 )
-RUTAS_PUBLICAS = ("/api/auth/login", "/api/auth/logout", "/api/auth/yo")
+RUTAS_PUBLICAS = ("/api/auth/login", "/api/auth/logout", "/api/auth/yo",
+                  "/api/telegram/cliente", "/api/telegram/admin")  # protegidas por el secreto de Telegram
 
 
 def usuarios_configurados() -> dict:

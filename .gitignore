@@ -14,3 +14,10 @@ frontend/dist/
 
 # Copias de PDF archivadas en local
 backend/archivo_pdfs/
+
+# Logs de la aplicación (se guardan en el Volume de Railway)
+*.log
+*.log.1
+
+# Parches temporales
+*.patch

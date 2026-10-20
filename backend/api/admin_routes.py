@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from database import database, models
 from servicios import railway_api, registro
+from servicios.telegram_bot import configurar_webhooks, estado_webhooks
 
 router = APIRouter(prefix="/admin")
 ZONA_CO = pytz.timezone("America/Bogota")
@@ -111,6 +112,16 @@ def metricas(dias: int = 30, db: Session = Depends(database.get_db)):
 @router.get("/logs")
 def logs_aplicacion(despues_de: int = 0, nivel: str = "todos", q: str = None, limite: int = 500):
     return registro.consultar(despues_de=despues_de, nivel=nivel, texto=q, limite=min(limite, 2000))
+
+
+@router.get("/telegram/estado")
+def estado_telegram():
+    return estado_webhooks()
+
+
+@router.post("/telegram/reconfigurar")
+def reconfigurar_telegram():
+    return configurar_webhooks()
 
 
 @router.get("/railway/estado")
