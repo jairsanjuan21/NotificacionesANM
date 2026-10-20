@@ -1,9 +1,9 @@
 /* Tablas (títulos y administración) */
 
 .tabla-contenedor { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio-l); overflow-x: auto; }
-.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-m); }
 .tabla th {
-  text-align: left; font-weight: 600; font-size: 12.5px; color: var(--tinta-3);
+  text-align: left; font-weight: 600; font-size: var(--texto-xs); color: var(--tinta-3);
   padding: 10px 14px; background: var(--superficie-2); border-bottom: 1px solid var(--linea);
   white-space: nowrap;
 }
@@ -12,15 +12,19 @@
 .tabla tbody tr.clicable { cursor: pointer; }
 .tabla tbody tr.clicable:hover td { background: var(--superficie-2); }
 .tabla .derecha { text-align: right; }
-.tabla .placa { font-size: 16px; }
+.tabla .placa { font-size: var(--texto-l); }
 
 .regionales { display: flex; gap: 4px; flex-wrap: wrap; }
-.regional { font-size: 12px; padding: 1px 8px; border-radius: 10px; background: var(--superficie-hundida); color: var(--tinta-2); white-space: nowrap; }
+.regional { font-size: var(--texto-xs); padding: 1px 8px; border-radius: 10px; background: var(--superficie-hundida); color: var(--tinta-2); white-space: nowrap; }
 
 .historial { list-style: none; margin: 0; padding: 0; }
 .historial li button {
   display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 12px; align-items: center;
   width: 100%; padding: 10px 0; border: 0; border-bottom: 1px solid var(--linea-suave);
-  background: none; text-align: left; cursor: pointer; font-size: 14px;
+  background: none; text-align: left; cursor: pointer; font-size: var(--texto-m);
 }
 .historial li button:hover { color: var(--verdin); }
+.tabla .celda-icono { width: 32px; }
+.texto-registro { margin: 0; white-space: pre-wrap; font-family: var(--mono); font-size: var(--texto-xs); color: var(--tinta-2); }
+.proximo-plazo { white-space: nowrap; font-weight: 600; }
+.proximo-plazo .pequeno { font-weight: 500; }

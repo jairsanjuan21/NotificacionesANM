@@ -4,10 +4,11 @@
   display: inline-flex; align-items: center; gap: 5px;
   height: 24px; padding: 0 9px;
   border-radius: 12px;
-  font-size: 12.5px; font-weight: 600;
+  font-size: var(--texto-xs); font-weight: 600;
   white-space: nowrap;
 }
 .insignia svg { flex-shrink: 0; }
+.insignia.mini { height: 20px; padding: 0 7px; font-size: var(--texto-mini); }
 .u-alta { background: var(--oxido-suave); color: var(--oxido); }
 .u-media { background: var(--ocre-suave); color: var(--ocre); }
 .u-baja { background: var(--malaquita-suave); color: var(--malaquita); }
@@ -19,4 +20,10 @@
 .e-en_tramite { background: var(--ocre-suave); color: var(--ocre); }
 .e-respondida { background: var(--malaquita-suave); color: var(--malaquita); }
 
-.marca-coactivo { background: var(--oxido); color: #fff; }
+.marca-coactivo { background: var(--oxido); color: var(--blanco); }
+
+/* Color del texto según qué tan cerca está el vencimiento (ver nivelPlazo) */
+.texto-plazo-critico { color: var(--oxido); }
+.texto-plazo-cerca { color: var(--ocre); }
+.texto-plazo-normal, .texto-plazo-vencido, .texto-plazo-null { color: var(--tinta-2); }
+.icono-reloj { vertical-align: -1px; margin-right: 3px; }

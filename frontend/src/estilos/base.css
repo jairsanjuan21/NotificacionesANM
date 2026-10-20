@@ -6,7 +6,7 @@ html, body { margin: 0; padding: 0; }
 
 body {
   font-family: var(--fuente);
-  font-size: 15px;
+  font-size: var(--texto-base);
   line-height: 1.5;
   color: var(--tinta);
   background: var(--roca);
@@ -15,9 +15,10 @@ body {
 }
 
 h1, h2, h3, h4 { margin: 0; line-height: 1.2; font-weight: 650; letter-spacing: -0.005em; }
-h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.015em; }
-h2 { font-size: 20px; }
-h3 { font-size: 16px; }
+/* Los títulos de página usan el eje de ancho: amplios como un horizonte */
+h1 { font-size: var(--texto-3xl); font-weight: 720; font-stretch: var(--ancho-amplio); letter-spacing: -0.02em; }
+h2 { font-size: var(--texto-xl); }
+h3 { font-size: var(--texto-l); }
 p { margin: 0; }
 a { color: var(--verdin); text-underline-offset: 2px; }
 button { font: inherit; color: inherit; }
@@ -28,18 +29,40 @@ input, select, textarea { font: inherit; color: inherit; }
 .num { font-variant-numeric: tabular-nums; }
 .tenue { color: var(--tinta-3); }
 .secundario-texto { color: var(--tinta-2); }
-.pequeno { font-size: 13px; }
-.muy-pequeno { font-size: 12px; }
+.pequeno { font-size: var(--texto-s); }
+.muy-pequeno { font-size: var(--texto-xs); }
 .oculto-visual { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* El código de placa: condensado y firme, como el rótulo de una estaca topográfica */
 .placa {
-  font-stretch: 72%;
+  font-stretch: var(--ancho-condensado);
   font-weight: 700;
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ---------- Primitivas de composición ----------
+   Pocas y con nombre de intención, para no llenar el JSX de style={{…}}.
+   pila  = elementos uno debajo de otro; hilera = uno al lado del otro. */
+.pila { display: flex; flex-direction: column; gap: var(--hueco, var(--espacio-3)); }
+.hilera { display: flex; align-items: center; flex-wrap: wrap; gap: var(--hueco, var(--espacio-2)); }
+.hueco-1 { --hueco: var(--espacio-1); }
+.hueco-2 { --hueco: var(--espacio-2); }
+.hueco-4 { --hueco: var(--espacio-4); }
+.empujar { margin-left: auto; }   /* manda al final de la hilera */
+.estirar { flex: 1; }             /* ocupa el espacio sobrante */
+.sin-salto { white-space: nowrap; }
+.recortar { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.encoger { min-width: 0; }
+
+/* Énfasis semántico del texto: por significado, no por color */
+.texto-peligro { color: var(--oxido); }
+.texto-alerta { color: var(--ocre); }
+.texto-fuerte { font-weight: 650; color: var(--tinta); }
+.texto-apagado { font-weight: 400; color: var(--tinta-3); }
+.medida { max-width: 72ch; }  /* línea cómoda de lectura */
+.icono-en-linea { vertical-align: -0.15em; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

@@ -5,12 +5,13 @@
   display: flex; gap: 10px; align-items: flex-start;
   padding: 12px 14px;
   border-radius: var(--radio-m);
-  background: var(--pizarra); color: #EEF3F2;
+  background: var(--pizarra); color: var(--noche-tinta);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
-  font-size: 14px;
+  font-size: var(--texto-m);
   animation: deslizar .18s ease-out;
 }
-.aviso .boton-icono { margin-left: auto; width: 26px; height: 26px; color: #A8B5B7; flex-shrink: 0; }
-.aviso.error svg:first-child { color: #F09A86; }
-.aviso.exito svg:first-child { color: #7FD0C4; }
+.aviso .boton-icono { margin-left: auto; width: 26px; height: 26px; color: var(--noche-tinta-2); flex-shrink: 0; }
+.aviso.error svg:first-child { color: var(--noche-oxido); }
+.aviso.exito svg:first-child { color: var(--noche-verdin); }
 @media (max-width: 860px) { .avisos { bottom: 84px; right: 16px; } }
+.aviso-texto { white-space: pre-line; }

@@ -33,15 +33,16 @@
   align-items: center;
   gap: 10px;
   padding: 22px 20px 18px;
-  color: #fff;
+  color: var(--blanco);
   text-decoration: none;
 }
+.marca-logo { color: var(--acento-pizarra); flex-shrink: 0; }
 .marca-texto { display: flex; flex-direction: column; line-height: 1.15; }
-.marca-texto strong { font-size: 17px; font-weight: 700; font-stretch: 85%; }
-.marca-texto span { font-size: 12px; color: var(--pizarra-tinta-2); }
+.marca-texto strong { font-size: var(--texto-l); font-weight: 700; font-stretch: 85%; }
+.marca-texto span { font-size: var(--texto-xs); color: var(--pizarra-tinta-2); }
 
 .navegacion { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; }
-.navegacion-grupo { margin-top: 18px; padding: 0 12px 6px; font-size: 12px; color: var(--pizarra-tinta-2); }
+.navegacion-grupo { margin-top: 18px; padding: 0 12px 6px; font-size: var(--texto-xs); color: var(--pizarra-tinta-2); }
 
 .nav-enlace {
   display: flex;
@@ -53,35 +54,41 @@
   text-decoration: none;
   font-weight: 520;
 }
-.nav-enlace:hover { background: var(--pizarra-2); color: #fff; }
-.nav-enlace.active { background: color-mix(in srgb, var(--acento-pizarra) 16%, transparent); color: #fff; box-shadow: inset 3px 0 0 var(--acento-pizarra); }
+.nav-enlace:hover { background: var(--pizarra-2); color: var(--blanco); }
+.nav-enlace.active { background: color-mix(in srgb, var(--acento-pizarra) 16%, transparent); color: var(--blanco); box-shadow: inset 3px 0 0 var(--acento-pizarra); }
 .nav-enlace .contador {
   margin-left: auto;
   min-width: 22px;
   padding: 0 7px;
   border-radius: 11px;
-  background: #B4412F;
-  color: #fff;
-  font-size: 12px;
+  background: var(--oxido);
+  color: var(--blanco);
+  font-size: var(--texto-xs);
   font-weight: 650;
   text-align: center;
   line-height: 20px;
 }
 
-.lateral-pie { margin-top: auto; padding: 14px 16px 18px; border-top: 1px solid rgba(255, 255, 255, .07); }
+.lateral-pie { margin-top: auto; padding: 14px 16px 18px; border-top: 1px solid rgb(255 255 255 / .07); }
+.lateral-tema {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--espacio-3);
+  font-size: var(--texto-xs); color: var(--pizarra-tinta-2);
+}
+.pie-movil { display: none; }
 .usuario-actual { display: flex; align-items: center; gap: 10px; }
 .avatar {
   width: 32px; height: 32px;
   border-radius: 50%;
   display: grid; place-items: center;
-  background: #2F7D74; color: #fff;
-  font-weight: 700; font-size: 14px;
+  background: var(--verdin); color: var(--blanco);
+  font-weight: 700; font-size: var(--texto-m);
   flex-shrink: 0;
 }
-.usuario-actual .nombre { font-size: 14px; color: #fff; font-weight: 600; line-height: 1.2; }
-.usuario-actual .rol { font-size: 12px; color: var(--pizarra-tinta-2); }
+.usuario-actual .nombre { font-size: var(--texto-m); color: var(--blanco); font-weight: 600; line-height: 1.2; }
+.usuario-actual .rol { font-size: var(--texto-xs); color: var(--pizarra-tinta-2); }
 .lateral-pie .boton-icono { margin-left: auto; color: var(--pizarra-tinta-2); }
-.lateral-pie .boton-icono:hover { color: #fff; background: var(--pizarra-2); }
+.lateral-pie .boton-icono:hover { color: var(--blanco); background: var(--pizarra-2); }
 
 .principal { min-width: 0; padding: 26px 32px 48px; }
 
@@ -105,7 +112,13 @@
   .principal { padding: 18px 16px 92px; }
   .barra-superior .acciones { width: 100%; }
   .barra-superior .acciones .boton { flex: 1; }
-  h1 { font-size: 24px; }
+  h1 { font-size: var(--texto-2xl); }
+  .pie-movil {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: var(--espacio-8); padding-top: var(--espacio-4);
+    border-top: 1px solid var(--linea);
+    font-size: var(--texto-s); color: var(--tinta-3);
+  }
   .nav-movil {
     display: grid;
     grid-auto-flow: column;
@@ -121,13 +134,13 @@
     padding: 6px 2px;
     background: none; border: 0;
     color: var(--pizarra-tinta-2);
-    font-size: 11px; text-decoration: none;
+    font-size: var(--texto-mini); text-decoration: none;
     position: relative;
   }
-  .nav-movil .active { color: #fff; }
+  .nav-movil .active { color: var(--blanco); }
   .nav-movil .contador {
     position: absolute; top: 2px; left: calc(50% + 6px);
-    background: #B4412F; color: #fff; border-radius: 9px;
-    font-size: 10px; line-height: 16px; min-width: 16px; padding: 0 4px;
+    background: var(--oxido); color: var(--blanco); border-radius: 9px;
+    font-size: var(--texto-mini); line-height: 16px; min-width: 16px; padding: 0 4px;
   }
 }

@@ -1,0 +1,43 @@
+/* Guía de diseño (admin) */
+
+.guia { display: grid; gap: var(--espacio-5); }
+.guia .tarjeta + .tarjeta { margin-top: 0; }
+.guia-intro { display: flex; justify-content: space-between; align-items: center; gap: var(--espacio-4); flex-wrap: wrap; }
+.guia code { font-family: var(--mono); font-size: var(--texto-xs); color: var(--tinta-3); }
+
+/* Minerales: cada muestra enseña el color fuerte sobre su versión suave */
+.muestras { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--espacio-4); }
+.muestra { display: flex; flex-direction: column; gap: 2px; font-size: var(--texto-s); }
+.muestra-color {
+  height: 72px; margin-bottom: var(--espacio-2);
+  border-radius: var(--radio-m);
+  background: var(--muestra-suave);
+  display: flex; align-items: flex-end; padding: var(--espacio-2);
+}
+.muestra-color span { width: 100%; height: 22px; border-radius: var(--radio-s); background: var(--muestra); }
+.muestra-uso { color: var(--tinta-2); }
+
+/* Estratos: una columna de roca vista de lado */
+.estratos { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); border-radius: var(--radio-m); overflow: hidden; border: 1px solid var(--linea); }
+.estratos div { height: 64px; background: var(--muestra); display: flex; align-items: flex-end; padding: var(--espacio-2); }
+.estratos code { background: var(--superficie); padding: 0 4px; border-radius: var(--radio-s); }
+
+.anchos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--espacio-4); margin-bottom: var(--espacio-6); }
+.anchos > div { display: flex; flex-direction: column; gap: 2px; font-size: var(--texto-s); color: var(--tinta-2); }
+.ancho-muestra { font-size: var(--texto-3xl); font-weight: 700; color: var(--tinta); line-height: 1.1; }
+.ancho-muestra.condensado { font-stretch: var(--ancho-condensado); }
+.ancho-muestra.amplio { font-stretch: var(--ancho-amplio); letter-spacing: -0.02em; }
+
+.escala { list-style: none; margin: 0; padding: 0; }
+.escala li { display: grid; grid-template-columns: 130px 1fr; align-items: baseline; gap: var(--espacio-4); padding: 6px 0; border-top: 1px solid var(--linea-suave); }
+.escala li span { line-height: 1.2; }
+
+.espacios { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--espacio-2); }
+.espacios li { display: flex; align-items: center; gap: var(--espacio-3); }
+.espacios li span { height: 12px; background: var(--verdin); border-radius: 2px; }
+
+.guia-campo { width: 280px; max-width: 100%; }
+
+.guia-retro { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--espacio-4); }
+.guia-caja { border: 1px dashed var(--linea); border-radius: var(--radio-m); display: grid; place-items: center; }
+.guia-caja .estado-vacio { padding: var(--espacio-6) var(--espacio-4); }

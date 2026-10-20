@@ -34,7 +34,7 @@ export function Plazo({ notif }) {
     <span className={`plazo ${nivel}`} title={notif.base_plazo || undefined}>
       <span className="fecha">{fechaCorta(notif.fecha_limite)}</span><br />
       <span className="restante">
-        {nivel === 'critico' && <Clock3 size={12} strokeWidth={2.6} style={{ verticalAlign: '-1px', marginRight: 3 }} />}
+        {nivel === 'critico' && <Clock3 size={12} strokeWidth={2.6} className="icono-reloj" />}
         {textoRestante(notif)}
       </span>
     </span>

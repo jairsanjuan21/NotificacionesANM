@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LogIn } from 'lucide-react';
 import api, { mensajeError } from '../servicios/api';
-import Contornos from '../componentes/Contornos';
+import Contornos from '../componentes/ui/Contornos';
 
 export default function Login({ onEntrar }) {
   const [usuario, setUsuario] = useState('');

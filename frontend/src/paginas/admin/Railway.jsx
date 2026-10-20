@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { RefreshCw, Loader2, KeyRound, Search } from 'lucide-react';
+import { RefreshCw, KeyRound, Search } from 'lucide-react';
 import api, { mensajeError } from '../../servicios/api';
 import ConsolaLogs from '../../componentes/ConsolaLogs';
 import useConsulta from '../../hooks/useConsulta';
+import Boton from '../../componentes/ui/Boton';
+import Tarjeta from '../../componentes/ui/Tarjeta';
+import Cargando from '../../componentes/ui/Cargando';
+import MensajeError from '../../componentes/ui/MensajeError';
 import { fechaHora, nivelDe } from '../../utilidades';
 
 const ESTADOS = {
@@ -51,53 +55,47 @@ export default function Railway() {
   const logs = logsQ.error ? [] : logsQ.datos;
   const cargarLogs = logsQ.recargar;
 
-  if (!estado) return <div className="cargando"><Loader2 size={18} className="girando" /> Consultando configuración…</div>;
+  if (!estado) return <Cargando>Consultando configuración…</Cargando>;
 
-  if (!estado.token_configurado || !estado.en_railway) {
+  if (!conectado) {
     return (
-      <section className="tarjeta" style={{ maxWidth: 720 }}>
-        <h2 style={{ display: 'flex', gap: 8, alignItems: 'center' }}><KeyRound size={18} /> Conectar los logs de Railway</h2>
-        <p className="subtitulo">{estado.en_railway ? 'Falta un token para leer los logs del servidor y del build.' : 'Esta sección funciona cuando la aplicación corre en Railway.'}</p>
+      <Tarjeta className="tarjeta-angosta" icono={KeyRound} titulo="Conectar los logs de Railway"
+        subtitulo={estado.en_railway ? 'Falta un token para leer los logs del servidor y del build.' : 'Esta sección funciona cuando la aplicación corre en Railway.'}>
         {estado.en_railway && (
-          <ol style={{ paddingLeft: 20, display: 'grid', gap: 8, color: 'var(--tinta-2)', margin: 0 }}>
+          <ol className="pasos">
             <li>En Railway, abra el proyecto y vaya a <strong>Project Settings → Tokens</strong>.</li>
             <li>Cree un token para el entorno <strong>{estado.entorno || 'production'}</strong> y cópielo.</li>
             <li>En el servicio, abra <strong>Variables</strong> y agregue <code>RAILWAY_API_TOKEN</code> con ese valor.</li>
             <li>Espere el redeploy y vuelva a esta pestaña.</li>
           </ol>
         )}
-      </section>
+      </Tarjeta>
     );
   }
 
   return (
-    <div className="rejilla-admin" style={{ gridTemplateColumns: 'minmax(240px, 300px) minmax(0, 1fr)' }}>
-      <section className="tarjeta" style={{ padding: '14px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px 8px' }}>
-          <h2 style={{ fontSize: 15 }}>Deployments</h2>
-          <button className="boton-icono" style={{ marginLeft: 'auto' }} onClick={cargarDeploys} title="Actualizar" aria-label="Actualizar deployments"><RefreshCw size={16} /></button>
-        </div>
-        {errorDeploys && <div className="mensaje-error" style={{ margin: '0 16px' }}>{errorDeploys}</div>}
-        {!deploys && !errorDeploys && <div className="cargando" style={{ padding: 16 }}><Loader2 size={16} className="girando" /> Cargando…</div>}
+    <div className="rejilla-railway">
+      <Tarjeta sinRelleno titulo="Deployments"
+        acciones={<button className="boton-icono" onClick={cargarDeploys} title="Actualizar" aria-label="Actualizar deployments"><RefreshCw size={16} /></button>}>
+        <div className="relleno-lateral"><MensajeError>{errorDeploys}</MensajeError></div>
+        {!deploys && !errorDeploys && <Cargando compacto />}
         <div role="listbox" aria-label="Deployments">
           {deploys?.map(d => {
             const est = ESTADOS[d.status] || { texto: d.status, clase: '' };
             return (
-              <button key={d.id} role="option" aria-selected={d.id === elegido} className="fila"
-                style={{ display: 'block', padding: '9px 16px', borderLeft: d.id === elegido ? '3px solid var(--verdin)' : '3px solid transparent' }}
-                onClick={() => setElegido(d.id)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span className="pequeno" style={{ fontWeight: 600 }}><span className={`punto-estado ${est.clase}`} />{est.texto}</span>
-                  {d.actual && <span className="insignia e-nueva" style={{ height: 20, fontSize: 11 }}>En uso</span>}
-                </div>
-                <div className="muy-pequeno tenue num">{fechaHora(d.createdAt)}</div>
+              <button key={d.id} role="option" aria-selected={d.id === elegido} className="opcion-deploy" onClick={() => setElegido(d.id)}>
+                <span className="hilera">
+                  <span className="pequeno texto-fuerte"><span className={`punto-estado ${est.clase}`} />{est.texto}</span>
+                  {d.actual && <span className="insignia mini e-nueva empujar">En uso</span>}
+                </span>
+                <span className="muy-pequeno tenue num">{fechaHora(d.createdAt)}</span>
               </button>
             );
           })}
         </div>
-      </section>
+      </Tarjeta>
 
-      <section>
+      <section className="pila">
         <div className="consola-barra">
           <div className="segmentado" role="group" aria-label="Tipo de log">
             <button aria-pressed={tipo === 'deploy'} onClick={() => setTipo('deploy')}>Servidor</button>
@@ -108,15 +106,13 @@ export default function Railway() {
             <input className="campo" type="search" placeholder="Filtrar en Railway y pulsar Enter" value={filtro}
               onChange={(e) => { setFiltro(e.target.value); if (!e.target.value) setFiltroAplicado(''); }} aria-label="Filtrar logs de Railway" />
           </form>
-          <span style={{ flex: 1 }} />
-          <button className="boton secundario pequeno" onClick={cargarLogs} disabled={cargando}>
-            <RefreshCw size={15} className={cargando ? 'girando' : ''} /> Actualizar
-          </button>
+          <span className="estirar" />
+          <Boton variante="secundario" tamano="pequeno" icono={RefreshCw} cargando={cargando} onClick={cargarLogs}>Actualizar</Boton>
         </div>
-        {errorLogs && <div className="mensaje-error" style={{ marginBottom: 10 }}>{errorLogs}</div>}
+        <MensajeError>{errorLogs}</MensajeError>
         <ConsolaLogs lineas={logs || []} busqueda={filtroAplicado}
           vacio={cargando ? 'Cargando logs de Railway…' : 'Railway no devolvió líneas para este deployment.'} />
-        <p className="muy-pequeno tenue" style={{ marginTop: 8 }}>Últimas 800 líneas del deployment seleccionado, leídas desde la API de Railway.</p>
+        <p className="muy-pequeno tenue">Últimas 800 líneas del deployment seleccionado, leídas desde la API de Railway.</p>
       </section>
     </div>
   );

@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { CheckCircle2, AlertTriangle, Send, Mail, Globe, BellRing, Archive, Loader2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Send, Mail, Globe, BellRing, Archive, RefreshCw } from 'lucide-react';
 import api, { mensajeError } from '../../servicios/api';
 import { useAvisos } from '../../contexto/avisos';
 import { useDatos } from '../../contexto/datos';
 import Barras from './Barras';
 import useConsulta from '../../hooks/useConsulta';
+import Boton from '../../componentes/ui/Boton';
+import Tarjeta from '../../componentes/ui/Tarjeta';
+import Cargando from '../../componentes/ui/Cargando';
+import EstadoVacio from '../../componentes/ui/EstadoVacio';
 import useIntervalo from '../../hooks/useIntervalo';
 import { bytesLegibles, diagnosticarProblemas, fechaHora, haceCuanto } from '../../utilidades';
 
@@ -50,10 +54,33 @@ export default function Resumen() {
     }
   };
 
-  if (error && !m) return <div className="vacio"><h3>No se pudo cargar el monitoreo</h3><p>{mensajeError(error)}</p><button className="boton" onClick={cargar}>Intentar de nuevo</button></div>;
-  if (!m) return <div className="cargando"><Loader2 size={18} className="girando" /> Cargando métricas…</div>;
+  if (error && !m) {
+    return (
+      <EstadoVacio tono="error" titulo="No se pudo cargar el monitoreo" accion={<Boton icono={RefreshCw} onClick={cargar}>Intentar de nuevo</Boton>}>
+        {mensajeError(error)}
+      </EstadoVacio>
+    );
+  }
+  if (!m) return <Cargando>Cargando métricas…</Cargando>;
 
   const problemas = diagnosticarProblemas(m, diag);
+
+  // Las acciones de mantenimiento son DATOS: agregar una nueva es agregar un objeto,
+  // no copiar y pegar otro botón con su lógica.
+  const acciones = [
+    { id: 'enviar', icono: Send, metodo: 'post', url: '/notificaciones/enviar-pendientes', texto: 'Reenviar notificaciones pendientes', enCurso: 'Enviando…',
+      exito: (d) => `${d.enviadas || 0} notificaciones enviadas.` },
+    { id: 'prueba', icono: Mail, metodo: 'post', url: '/alertas/prueba', texto: 'Enviar correo de prueba', enCurso: 'Enviando…',
+      exito: (d) => `Correo: ${d.correo}. Telegram: ${d.telegram}.` },
+    { id: 'portal', icono: Globe, metodo: 'get', url: '/salud/fuentes', texto: 'Verificar el portal de la ANM', enCurso: 'Revisando…',
+      exito: (d) => `Avisos: ${d.avisos?.filtro_placa_encontrado ? 'estructura correcta' : 'revisar'}.\nCobro coactivo: ${d.cobro_coactivo?.campo_palabra_clave ? 'estructura correcta' : 'revisar'}.` },
+    { id: 'record', icono: BellRing, metodo: 'post', url: '/recordatorios/ejecutar', texto: 'Enviar recordatorios ahora', enCurso: 'Revisando…',
+      exito: (d) => `${d.recordatorios || 0} recordatorios enviados.` },
+    { id: 'hist', icono: Archive, metodo: 'post', url: '/mantenimiento/procesar-historico', exito: 'Procesamiento del histórico iniciado.',
+      deshabilitada: historico?.en_curso || !historico?.sin_procesar, enCurso: 'Iniciando…',
+      texto: historico?.en_curso ? `Procesando histórico (${historico.sin_procesar} restantes)…`
+        : historico?.sin_procesar ? `Analizar y archivar ${historico.sin_procesar} notificaciones antiguas` : 'Histórico procesado' },
+  ];
   const b = m.barridos;
   const serie = b.serie.map(d => ({ ...d, exitosos: d.barridos - d.fallidos }));
   const totalAlmacen = m.almacenamiento.base_datos_bytes + m.almacenamiento.pdfs_bytes + m.almacenamiento.logs_bytes;
@@ -67,12 +94,12 @@ export default function Resumen() {
           {problemas.length ? (
             <ul>{problemas.map(p => <li key={p}>{p}</li>)}</ul>
           ) : (
-            <p className="secundario-texto" style={{ marginTop: 4 }}>
+            <p className="secundario-texto">
               Último barrido correcto {haceCuanto(b.ultimo_exitoso)}. Servidor en línea desde: {fechaHora(m.proceso.en_linea_desde)}
             </p>
           )}
         </div>
-        <button className="boton-icono" style={{ marginLeft: 'auto' }} onClick={cargar} title="Actualizar" aria-label="Actualizar"><RefreshCw size={17} /></button>
+        <button className="boton-icono empujar" onClick={cargar} title="Actualizar" aria-label="Actualizar"><RefreshCw size={17} /></button>
       </section>
 
       <div className="cifras">
@@ -80,71 +107,47 @@ export default function Resumen() {
         <div className="cifra-item"><div className="valor">{b.total ? `${Math.round((b.tasa_exito || 0) * 100)} %` : '—'}</div><div className="nombre">Barridos exitosos</div><div className="nota">{b.exitosos} de {b.total} en {m.periodo_dias} días</div></div>
         <div className="cifra-item"><div className="valor">{duracionLegible(b.duracion_media_seg)}</div><div className="nombre">Duración media</div><div className="nota">{b.consultas_error} consultas fallidas</div></div>
         <div className="cifra-item"><div className="valor">{b.nuevas}</div><div className="nombre">Notificaciones nuevas</div><div className="nota">en {m.periodo_dias} días</div></div>
-        <div className="cifra-item"><div className="valor" style={{ color: m.notificaciones.pendientes_envio ? 'var(--oxido)' : undefined }}>{m.notificaciones.pendientes_envio}</div><div className="nombre">Pendientes de envío</div><div className="nota">{m.notificaciones.con_resumen_ia} con resumen IA</div></div>
+        <div className="cifra-item"><div className={`valor ${m.notificaciones.pendientes_envio ? 'texto-peligro' : ''}`}>{m.notificaciones.pendientes_envio}</div><div className="nombre">Pendientes de envío</div><div className="nota">{m.notificaciones.con_resumen_ia} con resumen IA</div></div>
         <div className="cifra-item"><div className="valor">{bytesLegibles(totalAlmacen)}</div><div className="nombre">Almacenamiento</div><div className="nota">{m.almacenamiento.pdfs_archivos} PDF archivados</div></div>
       </div>
 
       <div className="rejilla-admin">
         <div>
-          <section className="tarjeta">
-            <h2>Barridos por día</h2>
-            <p className="subtitulo">Últimos {m.periodo_dias} días. Un barrido cuenta como fallido si no logró ninguna consulta a la ANM.</p>
+          <Tarjeta titulo="Barridos por día" subtitulo={`Últimos ${m.periodo_dias} días. Un barrido cuenta como fallido si no logró ninguna consulta a la ANM.`}>
             <Barras datos={serie} etiqueta="dia" alto={190}
               series={[{ clave: 'exitosos', nombre: 'Exitosos', clase: 'barra-principal' }, { clave: 'fallidos', nombre: 'Fallidos', clase: 'barra-alerta' }]}
               formatoEje={(d, largo) => { const [, mes, dia] = d.split('-'); return largo ? `${+dia} de ${MESES[+mes - 1]}` : `${+dia} ${MESES[+mes - 1]}`; }}
               descripcion="Barridos exitosos y fallidos por día" />
-          </section>
-          <section className="tarjeta">
-            <h2>Notificaciones publicadas por mes</h2>
-            <p className="subtitulo">Según la fecha de publicación en la ANM, últimos 12 meses.</p>
+          </Tarjeta>
+          <Tarjeta titulo="Notificaciones publicadas por mes" subtitulo="Según la fecha de publicación en la ANM, últimos 12 meses.">
             <Barras datos={m.notificaciones.por_mes} etiqueta="mes" alto={170}
               series={[{ clave: 'cantidad', nombre: 'Notificaciones', clase: 'barra-principal' }]}
               formatoEje={(v, largo) => { const [a, mes] = v.split('-'); return largo ? `${MESES[+mes - 1]} ${a}` : MESES[+mes - 1]; }}
               descripcion="Notificaciones publicadas por mes" />
-          </section>
+          </Tarjeta>
         </div>
 
         <div>
-          <section className="tarjeta">
-            <h2>Acciones</h2>
-            <p className="subtitulo">Herramientas de mantenimiento.</p>
+          <Tarjeta titulo="Acciones" subtitulo="Herramientas de mantenimiento.">
             <div className="acciones-admin">
-              <button className="boton secundario" disabled={!!ocupado} onClick={() => accion('enviar', 'post', '/notificaciones/enviar-pendientes', (d) => `${d.enviadas || 0} notificaciones enviadas.`)}>
-                <Send size={16} /> {ocupado === 'enviar' ? 'Enviando…' : 'Reenviar notificaciones pendientes'}
-              </button>
-              <button className="boton secundario" disabled={!!ocupado} onClick={() => accion('prueba', 'post', '/alertas/prueba', (d) => `Correo: ${d.correo}. Telegram: ${d.telegram}.`)}>
-                <Mail size={16} /> {ocupado === 'prueba' ? 'Enviando…' : 'Enviar correo de prueba'}
-              </button>
-              <button className="boton secundario" disabled={!!ocupado} onClick={() => accion('portal', 'get', '/salud/fuentes', (d) => {
-                const okA = d.avisos?.filtro_placa_encontrado, okC = d.cobro_coactivo?.campo_palabra_clave;
-                return `Avisos: ${okA ? 'estructura correcta' : 'revisar'}.\nCobro coactivo: ${okC ? 'estructura correcta' : 'revisar'}.`;
-              })}>
-                <Globe size={16} /> {ocupado === 'portal' ? 'Revisando…' : 'Verificar el portal de la ANM'}
-              </button>
-              <button className="boton secundario" disabled={!!ocupado} onClick={() => accion('record', 'post', '/recordatorios/ejecutar', (d) => `${d.recordatorios || 0} recordatorios enviados.`)}>
-                <BellRing size={16} /> {ocupado === 'record' ? 'Revisando…' : 'Enviar recordatorios ahora'}
-              </button>
-              <button className="boton secundario" disabled={!!ocupado || historico?.en_curso || !historico?.sin_procesar}
-                onClick={() => accion('hist', 'post', '/mantenimiento/procesar-historico', 'Procesamiento del histórico iniciado.')}>
-                <Archive size={16} />
-                {historico?.en_curso ? `Procesando histórico (${historico.sin_procesar} restantes)…`
-                  : historico?.sin_procesar ? `Analizar y archivar ${historico.sin_procesar} notificaciones antiguas` : 'Histórico procesado'}
-              </button>
+              {acciones.map(x => (
+                <Boton key={x.id} variante="secundario" icono={x.icono} cargando={ocupado === x.id}
+                  disabled={!!ocupado || x.deshabilitada} onClick={() => accion(x.id, x.metodo, x.url, x.exito)}>
+                  {ocupado === x.id ? x.enCurso : x.texto}
+                </Boton>
+              ))}
             </div>
-          </section>
+          </Tarjeta>
 
-          <section className="tarjeta">
-            <h2>Tareas programadas</h2>
-            <p className="subtitulo">Hora de Colombia. {agenda?.activo ? 'El programador está activo.' : 'El programador está detenido.'}</p>
+          <Tarjeta titulo="Tareas programadas" subtitulo={`Hora de Colombia. ${agenda?.activo ? 'El programador está activo.' : 'El programador está detenido.'}`}>
             <ul className="lista-simple">
               {agenda?.tareas_programadas?.map(t => (
-                <li key={t.id}><span>{t.descripcion}</span><span className="num tenue pequeno" style={{ whiteSpace: 'nowrap' }}>{t.proxima_ejecucion?.slice(5, 16)}</span></li>
+                <li key={t.id}><span>{t.descripcion}</span><span className="num tenue pequeno sin-salto">{t.proxima_ejecucion?.slice(5, 16)}</span></li>
               ))}
             </ul>
-          </section>
+          </Tarjeta>
 
-          <section className="tarjeta">
-            <h2>Datos</h2>
+          <Tarjeta titulo="Datos">
             <ul className="lista-simple">
               <li><span>Títulos vigilados</span><strong className="num">{m.clientes.activos} de {m.clientes.total}</strong></li>
               <li><span>Notificaciones en total</span><strong className="num">{m.notificaciones.total}</strong></li>
@@ -154,7 +157,7 @@ export default function Resumen() {
               <li><span>PDF archivados</span><strong className="num">{bytesLegibles(m.almacenamiento.pdfs_bytes)}</strong></li>
               <li><span>Logs guardados</span><strong className="num">{bytesLegibles(m.almacenamiento.logs_bytes)}</strong></li>
             </ul>
-          </section>
+          </Tarjeta>
         </div>
       </div>
     </>

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import api, { registrarAlExpirar } from './servicios/api';
 import useConsulta from './hooks/useConsulta';
+import Cargando from './componentes/ui/Cargando';
 import ProveedorAvisos from './contexto/ProveedorAvisos';
 import ProveedorDatos from './contexto/ProveedorDatos';
 import Marco from './layout/Marco';
@@ -26,7 +27,7 @@ export default function App() {
     setSesion(null);
   };
 
-  if (sesion === undefined) return <div className="cargando" style={{ padding: 40 }}>Cargando…</div>;
+  if (sesion === undefined) return <Cargando pantalla>Abriendo el panel…</Cargando>;
 
   return (
     <ProveedorAvisos>
