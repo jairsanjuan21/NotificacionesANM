@@ -151,6 +151,16 @@ def _linea_telegram(n) -> str:
             f"  <a href=\"{escape(n.url_pdf)}\">Ver documento</a>")
 
 
+def _botones_pdf(notifs):
+    """Botones para recibir el PDF desde el bot (importación diferida para no acoplar el correo al bot)."""
+    try:
+        from servicios.bot_cliente import botones_para_aviso
+        return botones_para_aviso(notifs)
+    except Exception as e:
+        print(f"[DISPATCHER] Sin botones de PDF en Telegram: {e}")
+        return None
+
+
 # ======================================================================= Notificaciones nuevas
 
 def enviar_alertas_pendientes(db: Session):
@@ -217,8 +227,9 @@ def enviar_alertas_pendientes(db: Session):
             print(f"[DISPATCHER] No se pudo enviar copia a {c.placa}: {e}")
 
     notificar_cliente(f"🔔 <b>{len(pendientes)} nueva(s) notificación(es) ANM</b>"
-                    + (f" — {altas} urgentes" if altas else "") + "\n\n"
-                    + "\n".join(_linea_telegram(n) for n in pendientes[:30]))
+                      + (f" — {altas} urgentes" if altas else "") + "\n\n"
+                      + "\n".join(_linea_telegram(n) for n in pendientes[:30]),
+                      botones=_botones_pdf(pendientes))
 
     return {"enviadas": len(pendientes), "copias_titulares": copias_ok, "copias_con_error": copias_error,
             "mensaje": "Notificaciones despachadas con éxito."}
@@ -265,7 +276,8 @@ def enviar_recordatorios(db: Session):
     db.commit()
 
     notificar_cliente(f"⏰ <b>{len(notifs)} notificación(es) por vencer</b>\n\n"
-                    + "\n".join(_linea_telegram(n) for n in notifs[:30]))
+                      + "\n".join(_linea_telegram(n) for n in notifs[:30]),
+                      botones=_botones_pdf(notifs))
     return {"recordatorios": len(notifs)}
 
 
