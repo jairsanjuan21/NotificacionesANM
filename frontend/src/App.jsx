@@ -5,6 +5,7 @@ import useConsulta from './hooks/useConsulta';
 import Cargando from './componentes/ui/Cargando';
 import ProveedorAvisos from './contexto/ProveedorAvisos';
 import ProveedorDatos from './contexto/ProveedorDatos';
+import ProveedorBarrido from './contexto/ProveedorBarrido';
 import Marco from './layout/Marco';
 import Login from './paginas/Login';
 import Bandeja from './paginas/Bandeja';
@@ -35,18 +36,20 @@ export default function App() {
         <Login onEntrar={setSesion} />
       ) : (
         <ProveedorDatos>
-          <Routes>
-            <Route element={<Marco sesion={sesion} onSalir={salir} />}>
-              <Route index element={<Bandeja />} />
-              <Route path="agenda" element={<Agenda />} />
-              <Route path="titulos" element={<Titulos />} />
-              <Route
-                path="admin/*"
-                element={sesion.rol === 'admin' ? <Admin /> : <Navigate to="/" replace />}
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
+          <ProveedorBarrido>
+            <Routes>
+              <Route element={<Marco sesion={sesion} onSalir={salir} />}>
+                <Route index element={<Bandeja />} />
+                <Route path="agenda" element={<Agenda />} />
+                <Route path="titulos" element={<Titulos />} />
+                <Route
+                  path="admin/*"
+                  element={sesion.rol === 'admin' ? <Admin /> : <Navigate to="/" replace />}
+                />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </ProveedorBarrido>
         </ProveedorDatos>
       )}
     </ProveedorAvisos>

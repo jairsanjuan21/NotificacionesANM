@@ -3,6 +3,7 @@ import { Inbox, CalendarClock, Mountain, Gauge, LogOut } from 'lucide-react';
 import { useDatos } from '../contexto/datos';
 import Contornos from '../componentes/ui/Contornos';
 import SelectorTema from '../componentes/ui/SelectorTema';
+import IndicadorBarrido from '../componentes/IndicadorBarrido';
 import { sinRevisar, iniciales, respondida } from '../utilidades';
 
 export default function Marco({ sesion, onSalir }) {
@@ -49,6 +50,7 @@ export default function Marco({ sesion, onSalir }) {
         </nav>
 
         <div className="lateral-pie">
+          <IndicadorBarrido />
           <div className="lateral-tema">
             <span>Tema</span>
             <SelectorTema />
