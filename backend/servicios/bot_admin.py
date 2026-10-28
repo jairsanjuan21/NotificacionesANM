@@ -2,7 +2,8 @@
 Bot del administrador: ver cómo trabaja el sistema por dentro.
 
 Comandos:
-  /estado            Resumen de salud: último barrido, próximas tareas, almacenamiento, webhooks.
+  /estado            En línea, último deploy, últimos barridos, últimos accesos y agenda.
+  /sistema           Detalle técnico: datos, almacenamiento, webhooks, healthchecks.
   /barridos          Últimos barridos; botón para ver el detalle de los que tuvieron problemas.
   /errores           Últimos errores y avisos del log.
   /logs [n]          Últimas n líneas del log (por defecto 20).
@@ -97,43 +98,140 @@ def _linea_barrido(e) -> str:
 
 # ============================================================================ /estado
 
-@comando("admin", "estado", "Salud general del sistema")
+DIAS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
+
+
+def _fecha_programador(dt) -> str:
+    local = dt.astimezone(ZONA_CO)
+    return f"{DIAS[local.weekday()]} {local.strftime('%d/%m %H:%M')}"
+
+
+def _resultado_barrido(e) -> str:
+    if e.estado == "en_curso":
+        return "⏳ en curso"
+    if e.estado == "fallida":
+        return "❌ error"
+    if (e.consultas_ok or 0) == 0:
+        return "❌ ninguna consulta funcionó"
+    if e.estado == "con_alertas":
+        return "⚠️ con alertas"
+    return "✅ todo OK"
+
+
+def _linea_ultimo_barrido(db, origen: str) -> str:
+    e = (db.query(models.Ejecucion).filter(models.Ejecucion.origen == origen)
+         .order_by(models.Ejecucion.inicio.desc()).first())
+    if e is None:
+        return "ninguno registrado"
+    alcance = ""
+    if e.id_cliente:
+        cliente = db.get(models.Cliente, e.id_cliente)
+        alcance = f", 1 placa: {escape(cliente.placa)}" if cliente else ", 1 placa"
+    return f"{_hace(e.inicio)} · {_resultado_barrido(e)} (#{e.id_ejecucion}{alcance})"
+
+
+def _linea_acceso(clave: str) -> str:
+    from servicios import actividad
+    fecha, detalle = actividad.ultima(clave)
+    if fecha is None:
+        return "sin registro"
+    return _hace(fecha) + (f" · {escape(detalle)}" if detalle else "")
+
+
+def _linea_deployment() -> str:
+    """
+    Versión que está corriendo y, si hay token de Railway, si el deploy más reciente es otro:
+    un deploy que falló deja corriendo la versión anterior, y eso conviene saberlo.
+    """
+    commit = (os.getenv("RAILWAY_GIT_COMMIT_SHA") or "")[:7]
+    mensaje = escape((os.getenv("RAILWAY_GIT_COMMIT_MESSAGE") or "").split("\n")[0][:60])
+    version = f"<code>{commit}</code> «{mensaje}»" if commit else "versión local (fuera de Railway)"
+    if not os.getenv("RAILWAY_API_TOKEN"):
+        return f"{version}\n    activo desde hace {_duracion(time.time() - INICIO_PROCESO)}"
+    try:
+        from servicios import railway_api
+        deploys = railway_api.listar_deployments(5)
+        actual = next((d for d in deploys if d.get("actual")), None)
+        texto = version
+        if actual and actual.get("createdAt"):
+            creado = datetime.fromisoformat(actual["createdAt"].replace("Z", "+00:00"))
+            texto += f"\n    desplegado {_hace(creado.replace(tzinfo=None))}"
+        reciente = deploys[0] if deploys else None
+        if reciente and not reciente.get("actual"):
+            estado = (reciente.get("status") or "").upper()
+            if estado in ("FAILED", "CRASHED"):
+                texto += "\n    ⚠️ <b>El deploy más reciente falló</b>: sigue corriendo esta versión"
+            elif estado in ("BUILDING", "DEPLOYING", "INITIALIZING", "QUEUED", "WAITING"):
+                texto += "\n    🔄 Hay un deploy nuevo en proceso"
+        return texto
+    except Exception as e:
+        return f"{version}\n    (no se pudo consultar Railway: {escape(str(e)[:80])})"
+
+
+@comando("admin", "estado", "Estado general: deploy, barridos, accesos y agenda")
 def cmd_estado(ctx: Contexto):
     ctx.accion()
+
+
+    problemas = healthchecks.autodiagnostico()
+    en_linea = f"hace {_duracion(time.time() - INICIO_PROCESO)} (desde {_hora_co(datetime.utcfromtimestamp(INICIO_PROCESO))})"
+    linea_salud = ("🟢 En línea " + en_linea) if not problemas else \
+        ("🔴 En línea con problemas " + en_linea + "\n" + "\n".join(f"    • {escape(p)}" for p in problemas))
+
     db = database.SessionLocal()
     try:
-        ultimo = db.query(models.Ejecucion).order_by(models.Ejecucion.inicio.desc()).first()
-        ultimo_ok = (db.query(models.Ejecucion)
-                     .filter(models.Ejecucion.estado.in_(["ok", "con_alertas"]), models.Ejecucion.consultas_ok > 0)
-                     .order_by(models.Ejecucion.inicio.desc()).first())
         en_curso = db.query(models.Ejecucion).filter(models.Ejecucion.estado == "en_curso").first()
+        automatico = _linea_ultimo_barrido(db, "automatico")
+        manual = _linea_ultimo_barrido(db, "manual")
+    finally:
+        db.close()
+
+    partes = [
+        f"🖥️ <b>Estado en línea del sistema</b>\n{linea_salud}",
+        f"🚀 <b>Último deployment en Railway</b>\n{_linea_deployment()}",
+        (f"⏳ <b>Barrido #{en_curso.id_ejecucion} en curso</b> desde {_hora_co(en_curso.inicio, '%H:%M')}\n\n" if en_curso else "")
+        + f"🤖 <b>Último barrido automático</b>\n{automatico}\n\n"
+        f"🖐️ <b>Último barrido manual</b>\n{manual}",
+        f"👤 <b>Último acceso admin</b> (panel)\n{_linea_acceso('web_admin')}\n\n"
+        f"👷 <b>Último acceso usuario</b> (panel)\n{_linea_acceso('web_usuario')}\n\n"
+        f"💬 <b>Último acceso Telegram cliente</b>\n{_linea_acceso('tg_cliente')}\n\n"
+        f"🛠️ <b>Último acceso Telegram admin</b>\n{_linea_acceso('tg_admin')}",
+    ]
+
+    if contexto_app.scheduler is not None:
+        tareas = sorted((j for j in contexto_app.scheduler.get_jobs() if j.next_run_time), key=lambda j: j.next_run_time)
+        # Los jobs de cada pocos minutos (latido, resumen de errores) no aportan en la agenda
+        tareas = [j for j in tareas if j.id not in ("latido", "resumen_errores")]
+        lineas = [f"{_fecha_programador(j.next_run_time)} · {escape(j.name.split('(')[0].strip())}" for j in tareas[:5]]
+        detenido = "" if contexto_app.scheduler.running else " ⛔ DETENIDO"
+        partes.append(f"🗓️ <b>Próximos eventos del programador</b>{detenido}\n" + "\n".join(lineas))
+
+    ctx.responder("\n\n".join(partes) + "\n\n<i>Detalle técnico: /sistema</i>")
+
+
+# ============================================================================ /sistema
+
+@comando("admin", "sistema", "Detalle técnico: datos, almacenamiento, webhooks")
+def cmd_sistema(ctx: Contexto):
+    ctx.accion()
+
+    db = database.SessionLocal()
+    try:
         total = db.query(models.Notificacion).count()
         sin_enviar = db.query(models.Notificacion).filter(models.Notificacion.notificacion_enviada == False).count()  # noqa: E712
         sin_procesar = db.query(models.Notificacion).filter(
             (models.Notificacion.procesada == False) | (models.Notificacion.procesada == None)).count()  # noqa: E711,E712
         placas = db.query(models.Cliente).filter(models.Cliente.activo == True).count()  # noqa: E712
+        ultimo_ok = (db.query(models.Ejecucion)
+                     .filter(models.Ejecucion.estado.in_(["ok", "con_alertas"]), models.Ejecucion.consultas_ok > 0)
+                     .order_by(models.Ejecucion.inicio.desc()).first())
     finally:
         db.close()
 
-    partes = [f"🖥️ <b>Estado del sistema</b>\nEn línea hace {_duracion(time.time() - INICIO_PROCESO)}"]
-
-    b = []
-    if en_curso:
-        b.append(f"⏳ Barrido #{en_curso.id_ejecucion} en curso desde {_hora_co(en_curso.inicio, '%H:%M')}")
-    if ultimo:
-        b.append(f"Último: {EMOJI_ESTADO.get(ultimo.estado, '•')} #{ultimo.id_ejecucion} {_hace(ultimo.inicio)} ({ultimo.origen})")
-    b.append(f"Último exitoso: {_hace(ultimo_ok.inicio) if ultimo_ok else 'ninguno'}")
-    partes.append("<b>Barridos</b>\n" + "\n".join(b))
-
-    if contexto_app.scheduler is not None:
-        tareas = sorted((j for j in contexto_app.scheduler.get_jobs() if j.next_run_time), key=lambda j: j.next_run_time)
-        lineas = [f"{_hora_co(j.next_run_time, '%a %d/%m %H:%M')} · {escape(j.name.split('(')[0].strip())}"
-                  for j in tareas[:5]]
-        estado = "activo" if contexto_app.scheduler.running else "⛔ DETENIDO"
-        partes.append(f"<b>Programador ({estado})</b>\n" + "\n".join(lineas))
-
-    partes.append(f"<b>Datos</b>\n{placas} placas activas · {total} notificaciones\n"
-                  f"{sin_enviar} pendientes de envío · {sin_procesar} sin procesar")
+    partes = ["🔧 <b>Detalle técnico</b>",
+              f"<b>Datos</b>\n{placas} placas activas · {total} notificaciones\n"
+              f"{sin_enviar} pendientes de envío · {sin_procesar} sin procesar\n"
+              f"Último barrido con consultas exitosas: {_hace(ultimo_ok.inicio) if ultimo_ok else 'ninguno'}"]
 
     try:
         db_path = os.getenv("DB_PATH") or database.SEED_DB_PATH
@@ -147,19 +245,17 @@ def cmd_estado(ctx: Contexto):
     except Exception as e:
         partes.append(f"<b>Almacenamiento</b>\nNo se pudo medir: {escape(str(e))}")
 
-    webhooks = estado_webhooks()
     lineas = []
-    for canal, info in webhooks.items():
+    for canal, info in estado_webhooks().items():
         if info is None:
             lineas.append(f"{canal}: sin configurar")
         else:
             error = f" · ⚠️ {escape(info['ultimo_error'])}" if info.get("ultimo_error") else ""
             lineas.append(f"{canal}: {'✅' if info['activo'] else '❌'} {info['pendientes']} pendientes{error}")
-    partes.append("<b>Telegram</b>\n" + "\n".join(lineas))
+    partes.append("<b>Webhooks de Telegram</b>\n" + "\n".join(lineas))
 
     hc = healthchecks.estado()
     partes.append("<b>healthchecks.io</b>\n" + " · ".join(f"{'✅' if v else '—'} {k}" for k, v in hc.items()))
-
     ctx.responder("\n\n".join(partes))
 
 

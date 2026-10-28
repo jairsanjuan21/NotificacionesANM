@@ -90,3 +90,12 @@ class Ejecucion(Base):
     consultas_error = Column(Integer, default=0)
     nuevas = Column(Integer, default=0)
     alertas = Column(Text, nullable=True)                 # Texto con los problemas detectados
+
+
+class Actividad(Base):
+    """Última vez que se vio cada tipo de acceso (panel admin, panel usuario, bots de Telegram)."""
+    __tablename__ = "actividad"
+
+    clave = Column(String, primary_key=True)        # web_admin, web_usuario, tg_cliente, tg_admin
+    fecha = Column(DateTime, nullable=False)        # UTC
+    detalle = Column(String, nullable=True)         # quién (usuario del panel o nombre en Telegram)
