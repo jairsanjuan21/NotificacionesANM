@@ -134,6 +134,12 @@ def _avisar_intruso(canal: str, chat_id: int, usuario: dict, texto: str):
                     f"<code>{'TG_CLIENTE_CHATS' if canal == 'cliente' else 'TG_ADMIN_CHAT'}</code> en Railway.")
 
 
+def _registrar_actividad(canal: str, usuario: dict):
+    from servicios import actividad
+    nombre = " ".join(x for x in (usuario.get("first_name"), usuario.get("last_name")) if x) or None
+    actividad.registrar(f"tg_{canal}", nombre)
+
+
 def _separar_comando(texto: str):
     """'/placa@NotificacionesANM_bot HAN-111' -> ('placa', 'HAN-111')"""
     primero, _, resto = texto.strip().partition(" ")
@@ -171,19 +177,22 @@ def procesar_update(canal: str, update: dict):
             return
 
         ctx = Contexto(canal=canal, chat_id=chat_id, texto=texto, usuario=usuario)
-
-        if texto.startswith("/"):
-            nombre, ctx.argumentos = _separar_comando(texto)
-            cmd = _COMANDOS[canal].get(nombre)
-            if cmd is None:
-                ctx.responder(f"No conozco el comando /{escape(nombre)}. Escribe /ayuda para ver las opciones.")
-                return
-            print(f"[BOT:{canal}] /{nombre} {ctx.argumentos}".rstrip())
-            cmd.funcion(ctx)
-        elif texto and canal in _TEXTO_LIBRE:
-            _TEXTO_LIBRE[canal](ctx)
-        else:
-            ctx.responder("Escribe /ayuda para ver lo que puedo hacer.")
+        try:
+            if texto.startswith("/"):
+                nombre, ctx.argumentos = _separar_comando(texto)
+                cmd = _COMANDOS[canal].get(nombre)
+                if cmd is None:
+                    ctx.responder(f"No conozco el comando /{escape(nombre)}. Escribe /ayuda para ver las opciones.")
+                    return
+                print(f"[BOT:{canal}] /{nombre} {ctx.argumentos}".rstrip())
+                cmd.funcion(ctx)
+            elif texto and canal in _TEXTO_LIBRE:
+                _TEXTO_LIBRE[canal](ctx)
+            else:
+                ctx.responder("Escribe /ayuda para ver lo que puedo hacer.")
+        finally:
+            # Después del comando: así /estado muestra el acceso anterior, no el que se está haciendo
+            _registrar_actividad(canal, usuario)
     except Exception as e:
         print(f"[BOT:{canal}] Error procesando la actualización: {e}")
 
@@ -204,6 +213,7 @@ def _procesar_callback(canal: str, cq: dict):
             funcion(ctx)
     finally:
         llamar(canal, "answerCallbackQuery", {"callback_query_id": cq["id"]})
+        _registrar_actividad(canal, cq.get("from", {}))
 
 
 # ============================================================================ comandos comunes a los dos bots

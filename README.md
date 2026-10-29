@@ -46,7 +46,7 @@ Si alguien no autorizado escribe, el bot le muestra su chat ID y avisa al admini
 `/placa HAN-111` (o la placa sola), `/vencimientos`, `/ultimas`.
 
 **Bot del administrador** — resumen al terminar cada barrido, aviso al arrancar el servidor,
-resumen de errores del log cada 15 minutos, y: `/estado`, `/barridos`, `/errores`, `/logs [n]`,
+resumen de errores del log cada 15 minutos, y: `/estado`, `/sistema`, `/barridos`, `/errores`, `/logs [n]`,
 `/buscar texto`, `/auditoria`, `/barrer`.
 
 ## Variables de entorno (Railway → Variables)

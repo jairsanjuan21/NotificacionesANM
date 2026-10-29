@@ -21,7 +21,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from database import models, database
 from database.migraciones import migrar
 from api import routes, auth_routes, admin_routes, telegram_routes
-from servicios import auth
+from servicios import actividad, auth
 from scraper.anm_scraper import ejecutar_scraper, cerrar_barridos_huerfanos
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
 from servicios.telegram_bot import configurar_webhooks
@@ -198,6 +198,7 @@ async def control_de_acceso(request: Request, call_next):
     if auth.requiere_admin(ruta) and sesion["rol"] != "admin":
         return JSONResponse({"detail": "Esta sección es solo para el administrador."}, status_code=403)
     request.state.sesion = sesion
+    actividad.registrar(f"web_{sesion['rol']}", sesion["usuario"])
     return await call_next(request)
 
 # Registrar las rutas de la API

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from servicios import auth
+from servicios import actividad, auth
 
 router = APIRouter()
 
@@ -32,6 +32,7 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response):
     response.set_cookie(auth.NOMBRE_COOKIE, auth.crear_token(datos.usuario.strip(), rol), max_age=auth.DURACION_SESION,
                         httponly=True, samesite="lax", secure=segura, path="/")
     print(f"[AUTH] Sesión iniciada: {datos.usuario.strip()} ({rol})")
+    actividad.registrar(f"web_{rol}", datos.usuario.strip())
     return {"usuario": datos.usuario.strip(), "rol": rol, "autenticacion": True}
 
 
