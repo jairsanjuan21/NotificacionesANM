@@ -22,14 +22,21 @@
 .agenda-item .que { min-width: 0; }
 .agenda-item .que .linea1 { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .agenda-item .que .linea1 .placa { font-size: var(--texto-l); }
-.agenda-item .que .linea2 { font-size: var(--texto-s); color: var(--tinta-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* El resumen es un <span>: sin `display` propio es un elemento en línea y `overflow: hidden` no le aplica,
+   por eso el texto se salía de su columna y quedaba debajo de las etiquetas. Se muestra en máximo 2 líneas. */
+.agenda-item .que .linea2 {
+  font-size: var(--texto-s); color: var(--tinta-2);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere;
+}
 .acto-agenda { font-size: var(--texto-m); }
-.agenda-estado { display: flex; flex-direction: column; align-items: flex-end; gap: var(--espacio-1); }
+.agenda-estado { display: flex; flex-direction: column; align-items: flex-end; gap: var(--espacio-1); white-space: nowrap; }
+.agenda-estado .hilera { flex-wrap: nowrap; }
 
 /* Celular: el estado baja debajo del texto para no apretar el título */
 @media (max-width: 860px) {
   .agenda-item { grid-template-columns: 56px minmax(0, 1fr); gap: var(--espacio-1) var(--espacio-3); align-items: start; }
   .agenda-item .dia-calendario { grid-row: span 2; }
-  .agenda-estado { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--espacio-2); }
-  .agenda-item .que .linea2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .agenda-estado { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--espacio-2); white-space: normal; }
+  .agenda-estado .hilera { flex-wrap: wrap; }
 }
