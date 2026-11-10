@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, Search, Pencil, Trash2, X, Download, FileSpreadsheet, Mail } from 'lucide-react';
+import { Plus, Upload, Search, Pencil, Trash2, X, Download, FileSpreadsheet, Mail, AlertTriangle } from 'lucide-react';
 import api, { API_BASE, mensajeError } from '../servicios/api';
 import { useDatos } from '../contexto/datos';
 import { useAvisos, useConfirmar } from '../contexto/avisos';
@@ -11,7 +11,7 @@ import BotonConsultar from '../componentes/BotonConsultar';
 import Cajon from '../componentes/ui/Cajon';
 import Boton from '../componentes/ui/Boton';
 import EstadoVacio from '../componentes/ui/EstadoVacio';
-import { REGIONALES, etiquetaRegional, listaRegionales, respondida, tiempoDe, fechaCorta, tituloActo, textoRestante, nivelPlazo } from '../utilidades';
+import { aInstante, fechaHora, REGIONALES, etiquetaRegional, listaRegionales, respondida, tiempoDe, fechaCorta, tituloActo, textoRestante, nivelPlazo } from '../utilidades';
 
 export default function Titulos() {
   const { clientes, notificaciones, recargar } = useDatos();
@@ -36,16 +36,32 @@ export default function Titulos() {
         const proximo = pendientes.filter(n => n.fecha_limite && n.dias_habiles_restantes >= 0)
           .sort((a, b) => tiempoDe(a.fecha_limite) - tiempoDe(b.fecha_limite))[0];
         const ultima = ns.reduce((m, n) => Math.max(m, tiempoDe(n.fecha_aviso)), 0);
-        return { c, ns, pendientes: pendientes.length, proximo, ultima };
+        // Fecha de alta: la real si existe. En los títulos anteriores a ese registro se estima con la
+        // primera vez que el sistema le guardó una notificación (el barrido siguiente a agregarlo).
+        const alta = aInstante(c.fecha_creacion);
+        const primerRegistro = ns.reduce((m, n) => Math.min(m, aInstante(n.fecha_registro)?.getTime() ?? Infinity), Infinity);
+        const agregado = alta ? alta.getTime() : (Number.isFinite(primerRegistro) ? primerRegistro : 0);
+        return { c, ns, pendientes: pendientes.length, proximo, ultima, agregado, altaEstimada: !alta };
       })
       .sort((a, b) => {
         if (orden === 'placa') return a.c.placa.localeCompare(b.c.placa);
+        if (orden === 'agregado') return (b.agregado - a.agregado) || (b.c.id_cliente - a.c.id_cliente);
         if (orden === 'reciente') return b.ultima - a.ultima;
         return (b.pendientes - a.pendientes) || ((a.proximo ? tiempoDe(a.proximo.fecha_limite) : Infinity) - (b.proximo ? tiempoDe(b.proximo.fecha_limite) : Infinity)) || a.c.placa.localeCompare(b.c.placa);
       });
   }, [clientes, notificaciones, busqueda, orden]);
 
   const filaAbierta = filas.find(f => f.c.id_cliente === abierto);
+
+  // Placas que son la misma salvo guiones o espacios (HGQ-15391 y HGQ15391)
+  const duplicados = useMemo(() => {
+    const grupos = new Map();
+    clientes.forEach(c => {
+      const clave = (c.placa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      grupos.set(clave, [...(grupos.get(clave) || []), c.placa]);
+    });
+    return [...grupos.values()].filter(g => g.length > 1);
+  }, [clientes]);
 
   return (
     <>
@@ -64,9 +80,17 @@ export default function Titulos() {
         <select className="campo" value={orden} onChange={(e) => setOrden(e.target.value)} aria-label="Ordenar títulos">
           <option value="pendientes">Con más pendientes primero</option>
           <option value="reciente">Con publicaciones más recientes</option>
+          <option value="agregado">Agregados más recientemente</option>
           <option value="placa">Por placa (A–Z)</option>
         </select>
       </div>
+
+      {duplicados.length > 0 && (
+        <div className="mensaje-error" role="alert">
+          <AlertTriangle size={16} />
+          <span>Posibles títulos repetidos: {duplicados.map(g => g.join(' y ')).join('; ')}. Revise y elimine el que sobre.</span>
+        </div>
+      )}
 
       {filas.length === 0 ? (
         <EstadoVacio titulo={clientes.length ? 'Ningún título coincide con la búsqueda' : 'Aún no hay títulos registrados'}>
@@ -83,10 +107,11 @@ export default function Titulos() {
                 <th className="derecha">Sin responder</th>
                 <th>Próximo vencimiento</th>
                 <th>Última publicación</th>
+                <th>Agregado</th>
               </tr>
             </thead>
             <tbody>
-              {filas.map(({ c, pendientes, proximo, ultima }) => (
+              {filas.map(({ c, pendientes, proximo, ultima, agregado, altaEstimada }) => (
                 <tr key={c.id_cliente} className="clicable" onClick={() => setAbierto(c.id_cliente)}
                   tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setAbierto(c.id_cliente); }}>
                   <td><span className="placa">{c.placa}</span>{!c.activo && <span className="muy-pequeno tenue"> pausado</span>}</td>
@@ -104,6 +129,11 @@ export default function Titulos() {
                     ) : <span className="tenue">—</span>}
                   </td>
                   <td className="num secundario-texto">{ultima ? fechaCorta(new Date(ultima).toISOString().slice(0, 10)) : <span className="tenue">Sin notificaciones</span>}</td>
+                  <td className="num secundario-texto"
+                    title={altaEstimada ? 'Fecha estimada: primera vez que el sistema le registró una notificación' : (c.creado_por ? `Agregado por ${c.creado_por}` : undefined)}>
+                    {agregado ? `${altaEstimada ? '≈ ' : ''}${fechaHora(new Date(agregado).toISOString())}` : <span className="tenue">Sin fecha</span>}
+                    <div className="muy-pequeno tenue">registro n.º {c.id_cliente}</div>
+                  </td>
                 </tr>
               ))}
             </tbody>
