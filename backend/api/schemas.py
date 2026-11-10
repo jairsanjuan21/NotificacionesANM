@@ -29,6 +29,8 @@ class ClienteUpdate(BaseModel):
 class ClienteResponse(ClienteBase):
     model_config = ConfigDict(from_attributes=True)
     id_cliente: int
+    fecha_creacion: Optional[datetime] = None
+    creado_por: Optional[str] = None
 
 
 class NotificacionResponse(BaseModel):
@@ -39,7 +41,9 @@ class NotificacionResponse(BaseModel):
     fecha_aviso: Optional[str] = None
     url_pdf: str
     notificacion_enviada: bool = False
+    fecha_envio: Optional[datetime] = None
     fecha_registro: Optional[datetime] = None
+    id_ejecucion: Optional[int] = None
 
     fuente: Optional[str] = "avisos"
     tipo_notificacion: Optional[str] = None

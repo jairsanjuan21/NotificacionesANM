@@ -39,6 +39,13 @@ export function diaSemana(texto) {
 
 export const mesCorto = (texto) => { const d = aFecha(texto); return d ? MESES_CORTOS[d.getMonth()] : ''; };
 
+/** Date a partir de un ISO del servidor, que llega en UTC pero sin la "Z" final. */
+export function aInstante(iso) {
+  if (!iso) return null;
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
+  return isNaN(d) ? null : d;
+}
+
 /** Fecha y hora en Colombia a partir de un ISO en UTC del servidor. */
 export function fechaHora(iso) {
   if (!iso) return '—';

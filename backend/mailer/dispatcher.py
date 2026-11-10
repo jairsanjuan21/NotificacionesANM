@@ -1,6 +1,7 @@
 import os
 import smtplib
 from collections import defaultdict
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
@@ -47,7 +48,12 @@ def _enviar_via_brevo_o_smtp(remitente: str, destinatario: str, password: str, a
         )
         if response.status_code not in (200, 201, 202):
             raise Exception(f"Error API Brevo ({response.status_code}): {response.text}")
-        print(f"[DISPATCHER HTTP] Correo enviado vía Brevo a: {', '.join(lista_correos)}")
+        try:
+            id_mensaje = response.json().get("messageId", "")
+        except Exception:
+            id_mensaje = ""
+        # El messageId permite buscar este correo en Brevo (Transaccional → Registros) y ver si se entregó
+        print(f"[DISPATCHER HTTP] Correo aceptado por Brevo para: {', '.join(lista_correos)} | messageId={id_mensaje}")
         return True
 
     if not password:
@@ -202,10 +208,13 @@ def enviar_alertas_pendientes(db: Session):
         print(f"[CRITICAL] Falla en el protocolo de Correo: {e}")
         return {"enviadas": 0, "error": str(e)}
 
+    ahora = datetime.utcnow()
     for n in pendientes:
         n.notificacion_enviada = True
+        n.fecha_envio = ahora
     db.commit()
-    print(f"[SUCCESS] {len(pendientes)} notificaciones marcadas como enviadas.")
+    detalle = ", ".join(f"#{n.id_notificacion} {n.cliente.placa if n.cliente else '?'}" for n in pendientes[:40])
+    print(f"[SUCCESS] {len(pendientes)} notificaciones marcadas como enviadas a {destinatario}: {detalle}")
 
     # Copia a cada titular con correo registrado (los fallos no afectan el envío principal)
     copias_ok, copias_error = 0, 0

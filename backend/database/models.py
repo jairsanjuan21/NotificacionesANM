@@ -17,6 +17,10 @@ class Cliente(Base):
     email = Column(String, nullable=True)   # Correo(s) del titular, separados por coma
     nit = Column(String, nullable=True)     # NIT/C.C. para buscar en cobro coactivo
 
+    # Trazabilidad: cuándo y quién agregó el título (vacío en los que ya existían antes de este campo)
+    fecha_creacion = Column(DateTime, nullable=True)   # UTC
+    creado_por = Column(String, nullable=True)         # usuario del panel; "(Excel)" si fue por importación
+
     notificaciones = relationship("Notificacion", back_populates="cliente")
 
 
@@ -33,6 +37,8 @@ class Notificacion(Base):
     url_pdf = Column(String, nullable=False)
     fecha_registro = Column(DateTime, default=datetime.utcnow)
     notificacion_enviada = Column(Boolean, default=False)
+    fecha_envio = Column(DateTime, nullable=True)         # Cuándo salió el correo de aviso (UTC)
+    id_ejecucion = Column(Integer, nullable=True)         # Barrido que la detectó
 
     # Origen
     fuente = Column(String, default="avisos")             # avisos | coactivo
