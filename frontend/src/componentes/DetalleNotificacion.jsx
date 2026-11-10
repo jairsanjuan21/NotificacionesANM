@@ -5,7 +5,7 @@ import { useDatos } from '../contexto/datos';
 import { useAvisos, useConfirmar } from '../contexto/avisos';
 import Boton from './ui/Boton';
 import { InsigniaUrgencia, InsigniaEstado, InsigniaCoactivo } from './Insignias';
-import { ESTADOS, fechaLarga, fechaCorta, fechaHora, nivelPlazo, textoRestante, tituloActo, nombreDocumento, listaRegionales, etiquetaRegional } from '../utilidades';
+import { ESTADOS, aFecha, aInstante, fechaLarga, fechaCorta, fechaHora, nivelPlazo, textoRestante, tituloActo, nombreDocumento, listaRegionales, etiquetaRegional } from '../utilidades';
 
 /**
  * Panel con el detalle de una notificación.
@@ -74,6 +74,9 @@ export default function Detalle({ notif, onCerrar }) {
   };
 
   const nivel = nivelPlazo(notif) || 'normal';
+  // La ANM suele subir los estados la tarde anterior a su fecha de fijación
+  const detectada = aInstante(notif.fecha_registro);
+  const publicadaDespues = Boolean(detectada && aFecha(notif.fecha_aviso) && aFecha(notif.fecha_aviso) > detectada);
   const urlCopia = `${API_BASE}/notificaciones/${notif.id_notificacion}/pdf`;
   const notasCambiaron = (notas || '') !== (notif.notas || '');
 
@@ -133,6 +136,12 @@ export default function Detalle({ notif, onCerrar }) {
               {' '}Publicado el {fechaCorta(notif.fecha_aviso)}.
             </p>
           )}
+          <p className="base-calculo">
+            Detectada por el sistema: {fechaHora(notif.fecha_registro)}
+            {publicadaDespues && ' (la ANM la subió antes de su fecha de publicación)'}.
+            {' '}Aviso por correo: {notif.fecha_envio ? `enviado el ${fechaHora(notif.fecha_envio)}`
+              : notif.notificacion_enviada ? 'marcado como enviado (sin fecha registrada)' : 'pendiente de envío'}.
+          </p>
         </section>
 
         <section className="bloque">

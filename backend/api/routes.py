@@ -1,11 +1,14 @@
 import csv
 import io
 import os
+import re
 import threading
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from html import escape
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -16,7 +19,8 @@ from scraper.anm_scraper import (BarridoEnCurso, barrido_en_curso, iniciar_barri
                                  procesar_historico,
                                  REGIONALES_ANM, URL_BASE, URL_COACTIVO, descubrir_formulario)
 from servicios.analizador import normalizar
-from servicios.telegram import canal_configurado, enviar_mensaje, estado_canales, telegram_configurado
+from servicios.telegram import (canal_configurado, enviar_mensaje, estado_canales, notificar_admin,
+                                telegram_configurado)
 from servicios import plazos
 
 router = APIRouter()
@@ -35,16 +39,53 @@ def _limpiar_texto(v: Optional[str]) -> Optional[str]:
 
 # ============================================================ CLIENTES (PLACAS)
 
+def _clave_placa(placa: Optional[str]) -> str:
+    """Solo letras y números: 'HGQ-15391', 'hgq 15391' y 'HGQ15391' son el mismo título."""
+    return re.sub(r"[^A-Z0-9]", "", (placa or "").upper())
+
+
+def _placa_equivalente(db: Session, placa: str, excluir_id: Optional[int] = None):
+    """Devuelve el título ya registrado cuya placa es la misma salvo guiones o espacios (o None)."""
+    clave = _clave_placa(placa)
+    if not clave:
+        return None
+    for c in db.query(models.Cliente).all():
+        if c.id_cliente != excluir_id and _clave_placa(c.placa) == clave:
+            return c
+    return None
+
+
+def _quien(request: Request) -> str:
+    sesion = getattr(request.state, "sesion", None)
+    return sesion["usuario"] if sesion else "sin sesión"
+
+
+def _avisar_cambio_titulos(texto_html: str):
+    """Deja rastro en los logs y avisa al administrador por Telegram. Nunca interrumpe la operación."""
+    print(f"[TÍTULOS] {re.sub(r'<[^>]+>', '', texto_html)}")
+    try:
+        notificar_admin(texto_html, silencioso=True)
+    except Exception as e:
+        print(f"[!] No se pudo avisar el cambio de títulos por Telegram: {e}")
+
+
 @router.get("/clientes", response_model=List[schemas.ClienteResponse])
 def obtener_clientes(db: Session = Depends(database.get_db)):
     return db.query(models.Cliente).order_by(models.Cliente.placa.asc()).all()
 
 
 @router.post("/clientes", response_model=schemas.ClienteResponse)
-def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(database.get_db)):
+def crear_cliente(cliente: schemas.ClienteCreate, request: Request, db: Session = Depends(database.get_db)):
     placa_limpia = cliente.placa.strip().upper()
-    if db.query(models.Cliente).filter(models.Cliente.placa == placa_limpia).first():
-        raise HTTPException(status_code=400, detail=f"La placa {placa_limpia} ya está registrada.")
+    if not _clave_placa(placa_limpia):
+        raise HTTPException(status_code=400, detail="Escriba la placa del título minero.")
+    repetido = _placa_equivalente(db, placa_limpia)
+    if repetido:
+        igual = repetido.placa == placa_limpia
+        raise HTTPException(status_code=400, detail=(
+            f"La placa {placa_limpia} ya está registrada." if igual else
+            f"La placa {placa_limpia} es la misma que {repetido.placa}, que ya está registrada "
+            "(solo cambian guiones o espacios)."))
     nuevo = models.Cliente(
         placa=placa_limpia,
         nombre_empresa=cliente.nombre_empresa.strip() if cliente.nombre_empresa else "SIN NOMBRE",
@@ -52,10 +93,14 @@ def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(database
         activo=cliente.activo,
         email=_limpiar_texto(cliente.email),
         nit=_limpiar_texto(cliente.nit),
+        fecha_creacion=datetime.utcnow(),
+        creado_por=_quien(request),
     )
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
+    _avisar_cambio_titulos(f"➕ <b>Título agregado</b>: {escape(nuevo.placa)} — {escape(nuevo.nombre_empresa or '')}\n"
+                           f"Por: {escape(nuevo.creado_por)} (panel). Total: {db.query(models.Cliente).count()}")
     return nuevo
 
 
@@ -68,8 +113,9 @@ def actualizar_cliente(id_cliente: int, datos: schemas.ClienteUpdate, db: Sessio
     if datos.placa is not None:
         nueva_placa = datos.placa.strip().upper()
         if nueva_placa != cliente.placa:
-            if db.query(models.Cliente).filter(models.Cliente.placa == nueva_placa).first():
-                raise HTTPException(status_code=400, detail="Otra placa ya tiene ese código.")
+            repetido = _placa_equivalente(db, nueva_placa, excluir_id=id_cliente)
+            if repetido:
+                raise HTTPException(status_code=400, detail=f"Ese código ya lo tiene el título {repetido.placa}.")
             cliente.placa = nueva_placa
     if datos.nombre_empresa is not None:
         cliente.nombre_empresa = datos.nombre_empresa.strip()
@@ -88,14 +134,17 @@ def actualizar_cliente(id_cliente: int, datos: schemas.ClienteUpdate, db: Sessio
 
 
 @router.delete("/clientes/{id_cliente}")
-def eliminar_cliente(id_cliente: int, db: Session = Depends(database.get_db)):
+def eliminar_cliente(id_cliente: int, request: Request, db: Session = Depends(database.get_db)):
     cliente = db.query(models.Cliente).filter(models.Cliente.id_cliente == id_cliente).first()
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no encontrado.")
     db.query(models.Notificacion).filter(models.Notificacion.id_cliente == id_cliente).delete()
+    placa, titular = cliente.placa, cliente.nombre_empresa or ""
     db.delete(cliente)
     db.commit()
-    return {"mensaje": f"Placa {cliente.placa} y su historial eliminados correctamente."}
+    _avisar_cambio_titulos(f"🗑 <b>Título eliminado</b>: {escape(placa)} — {escape(titular)}\n"
+                           f"Por: {escape(_quien(request))} (panel). Total: {db.query(models.Cliente).count()}")
+    return {"mensaje": f"Placa {placa} y su historial eliminados correctamente."}
 
 
 COLUMNAS_IMPORTACION = {
@@ -135,16 +184,23 @@ def _leer_archivo_importacion(nombre: str, contenido: bytes):
 
 
 @router.post("/clientes/importar")
-async def importar_clientes(archivo: UploadFile = File(...), db: Session = Depends(database.get_db)):
+async def importar_clientes(request: Request, archivo: UploadFile = File(...),
+                            db: Session = Depends(database.get_db)):
     """Crea o actualiza placas desde Excel/CSV con columnas: placa, titular, regional, email, nit."""
     registros = _leer_archivo_importacion(archivo.filename or "", await archivo.read())
     creados, actualizados, omitidos = 0, 0, []
+    ahora, quien, placas_creadas = datetime.utcnow(), f"{_quien(request)} (Excel)", []
+    # Índice por placa "sin adornos" para no crear HGQ15391 si ya existe HGQ-15391 (ni repetir dentro del archivo)
+    por_clave = {_clave_placa(c.placa): c for c in db.query(models.Cliente).all()}
     for i, r in enumerate(registros, start=2):
         placa = (r.get("placa") or "").strip().upper()
         if not placa:
             omitidos.append(f"Fila {i}: sin placa")
             continue
-        existente = db.query(models.Cliente).filter(models.Cliente.placa == placa).first()
+        existente = por_clave.get(_clave_placa(placa))
+        if existente is not None and existente.placa != placa:
+            omitidos.append(f"Fila {i}: {placa} es la misma placa que {existente.placa}, que ya está registrada")
+            continue
         if existente:
             if r.get("nombre_empresa"):
                 existente.nombre_empresa = r["nombre_empresa"].strip().upper()
@@ -156,16 +212,25 @@ async def importar_clientes(archivo: UploadFile = File(...), db: Session = Depen
                 existente.nit = r["nit"].strip()
             actualizados += 1
         else:
-            db.add(models.Cliente(
+            nuevo = models.Cliente(
                 placa=placa,
                 nombre_empresa=(r.get("nombre_empresa") or "SIN NOMBRE").strip().upper(),
                 regional=_limpiar_regional(r.get("regional")),
                 activo=True,
                 email=_limpiar_texto(r.get("email")),
                 nit=_limpiar_texto(r.get("nit")),
-            ))
+                fecha_creacion=ahora,
+                creado_por=quien,
+            )
+            db.add(nuevo)
+            por_clave[_clave_placa(placa)] = nuevo
+            placas_creadas.append(placa)
             creados += 1
     db.commit()
+    if placas_creadas:
+        lista = ", ".join(escape(p) for p in placas_creadas[:30]) + (" …" if len(placas_creadas) > 30 else "")
+        _avisar_cambio_titulos(f"➕ <b>{len(placas_creadas)} título(s) agregados desde Excel</b>: {lista}\n"
+                               f"Por: {escape(_quien(request))}. Total: {db.query(models.Cliente).count()}")
     return {"creados": creados, "actualizados": actualizados, "omitidos": omitidos}
 
 

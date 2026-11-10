@@ -141,8 +141,9 @@ def extraer_enlaces_de_placa_en_pdf(doc_pdf, placa: str) -> set:
 # ======================================================================= Estado del barrido
 
 class Contexto:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, id_ejecucion: int = None):
         self.db = db
+        self.id_ejecucion = id_ejecucion
         self.sesion = requests.Session()
         self.sesion.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
@@ -169,7 +170,7 @@ class Contexto:
         es_antigua = bool(minima and parsear_fecha(fecha_iso) and parsear_fecha(fecha_iso) < minima)
         n = Notificacion(id_cliente=cliente.id_cliente, fecha_aviso=fecha_iso, url_pdf=url,
                          notificacion_enviada=es_antigua, fuente=fuente, tipo_notificacion=tipo or None,
-                         numero=numero or None, estado="nueva")
+                         numero=numero or None, estado="nueva", id_ejecucion=self.id_ejecucion)
         n.cliente = cliente
         self.db.add(n)
         self.nuevas.append(n)
@@ -318,7 +319,7 @@ def _ejecutar_barrido(id_ejecucion: int, id_cliente_especifico: int = None, hc: 
     print("Iniciando motor de extracción ANM (Avisos + Cobro coactivo)...")
     db: Session = SessionLocal()
     ejec = db.get(Ejecucion, id_ejecucion)
-    ctx = Contexto(db)
+    ctx = Contexto(db, id_ejecucion)
 
     try:
         query = db.query(Cliente).filter(Cliente.activo == True)
