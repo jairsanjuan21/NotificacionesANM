@@ -26,6 +26,17 @@ COPY backend/ ./backend/
 # Traer la carpeta compilada 'dist' desde la Etapa 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Exponer puerto y arrancar FastAPI
+# Versión desplegada: la inyecta deploy/deploy.sh (aparece en /estado del bot admin y en el aviso de arranque)
+ARG APP_COMMIT_SHA=""
+ARG APP_COMMIT_MESSAGE=""
+ENV APP_COMMIT_SHA=$APP_COMMIT_SHA \
+    APP_COMMIT_MESSAGE=$APP_COMMIT_MESSAGE \
+    PYTHONUNBUFFERED=1 \
+    TZ=America/Bogota
+
+# Exponer puerto y arrancar FastAPI.
+# Un solo proceso a propósito: el programador de tareas vive dentro de la app y con varios
+# workers cada barrido se ejecutaría varias veces.
 WORKDIR /app/backend
+EXPOSE 8000
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

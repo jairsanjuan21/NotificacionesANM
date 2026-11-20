@@ -1,0 +1,14 @@
+.git
+.github
+deploy
+**/node_modules
+**/__pycache__
+**/*.pyc
+frontend/dist
+backend/venv
+backend/.venv
+backend/.env
+backend/archivo_pdfs
+.env
+*.log
+*.patch

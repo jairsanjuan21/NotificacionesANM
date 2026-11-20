@@ -25,16 +25,18 @@ export default function Configuracion() {
   if (error) return <EstadoVacio tono="error" titulo="No se pudo leer la configuración">{error}</EstadoVacio>;
   if (!diag) return <Cargando>Leyendo configuración…</Cargando>;
 
-  const correoOk = diag.modo_envio === 'brevo_api' && diag.EMAIL_SENDER && diag.EMAIL_RECEIVER;
+  const correoOk = diag.modo_envio !== 'sin_configurar' && diag.EMAIL_SENDER && diag.EMAIL_RECEIVER;
   const volumen = !diag.base_de_datos?.startsWith('repositorio');
 
   return (
     <div className="rejilla-admin">
       <section className="tarjeta">
         <h2>Variables del servidor</h2>
-        <p className="subtitulo">Se configuran en Railway, en la pestaña Variables del servicio. Los valores nunca se muestran aquí.</p>
+        <p className="subtitulo">Se configuran en el archivo .env del servidor. Los valores nunca se muestran aquí.</p>
         <Fila estado={correoOk ? 'ok' : 'mal'} titulo="Envío de correos">
-          {correoOk ? 'Brevo configurado con remitente y destinatarios.' : <>Requiere <code>BREVO_API_KEY</code>, <code>EMAIL_SENDER</code> y <code>EMAIL_RECEIVER</code>. Modo actual: {diag.modo_envio}.</>}
+          {correoOk
+            ? (diag.modo_envio === 'gmail_smtp' ? `SMTP de Gmail (${diag.smtp_servidor}) con remitente y destinatarios.` : 'Brevo configurado con remitente y destinatarios.')
+            : <>Requiere <code>EMAIL_SENDER</code>, <code>EMAIL_RECEIVER</code> y <code>EMAIL_PASSWORD</code> (contraseña de aplicación de Gmail). Modo actual: {diag.modo_envio}.</>}
         </Fila>
         <Fila estado={volumen ? 'ok' : 'mal'} titulo="Base de datos persistente">
           {volumen ? `Guardada en ${diag.base_de_datos}.` : <>Monte un Volume en <code>/data</code> y defina <code>DB_PATH=/data/anm_notificaciones.db</code>.</>}
@@ -58,13 +60,19 @@ export default function Configuracion() {
 
       <section className="tarjeta">
         <h2>Entorno</h2>
-        <p className="subtitulo">Datos que Railway entrega al servidor.</p>
+        <p className="subtitulo">Dónde está corriendo el sistema.</p>
         <ul className="lista-simple">
-          <li><span>Corre en Railway</span><strong>{railway?.en_railway ? 'Sí' : 'No'}</strong></li>
+          <li><span>Plataforma</span><strong>{railway?.en_railway ? 'Railway' : 'Servidor propio (VPS)'}</strong></li>
           <li><span>Entorno</span><strong>{railway?.entorno || '—'}</strong></li>
           <li><span>Servicio</span><strong>{railway?.servicio || '—'}</strong></li>
           <li><span>Notificaciones pendientes de envío</span><strong className="num">{diag.notificaciones_pendientes}</strong></li>
         </ul>
+      </section>
+
+      <section className="tarjeta">
+        <h2>Respaldo</h2>
+        <p className="subtitulo">Base de datos y PDF archivados en un solo archivo .tar.gz. Guárdelo fuera del servidor.</p>
+        <a className="boton secundario" href="/api/admin/respaldo" download>Descargar respaldo</a>
       </section>
     </div>
   );

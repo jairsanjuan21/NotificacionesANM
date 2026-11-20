@@ -1,0 +1,34 @@
+# Proxy de entrada compartido por TODOS los proyectos del VPS (ANM, Fersautos, SGSST...).
+# Caddy saca y renueva solo los certificados HTTPS de Let's Encrypt.
+# Se instala una sola vez en /opt/proxy (ver deploy/DESPLIEGUE_VPS.md).
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sitios:/etc/caddy/sitios:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  proxy:
+    name: proxy

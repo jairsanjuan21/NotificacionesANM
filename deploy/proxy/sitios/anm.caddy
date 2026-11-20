@@ -1,0 +1,20 @@
+# NotificacionesANM. ANM_DOMINIO viene de deploy/proxy/.env,
+# p. ej. anm.203-0-113-10.sslip.io (la IP del VPS con guiones).
+{$ANM_DOMINIO} {
+	encode zstd gzip
+
+	# Importación de placas desde Excel y PDFs: margen amplio
+	request_body {
+		max_size 25MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy notificaciones-anm:8000
+}

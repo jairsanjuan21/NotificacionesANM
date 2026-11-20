@@ -1,0 +1,31 @@
+# Deploy automático al VPS en cada push a main (equivale al auto-deploy que daba Railway).
+# Secrets del repo (Settings → Secrets and variables → Actions):
+#   VPS_HOST     IP del VPS
+#   VPS_USER     usuario de despliegue (p. ej. deploy)
+#   VPS_SSH_KEY  llave privada SSH de ese usuario (la pública va en ~/.ssh/authorized_keys del VPS)
+name: Deploy al VPS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:      # botón "Run workflow" para desplegar a mano
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Desplegar por SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 15m
+          script: /opt/apps/NotificacionesANM/deploy/deploy.sh

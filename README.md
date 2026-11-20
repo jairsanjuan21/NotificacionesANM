@@ -39,7 +39,7 @@ calcula su fecha límite estimada y avisa por correo (y opcionalmente por Telegr
 ## Bots de Telegram
 
 Dos bots independientes, cada uno con su lista blanca de chats. Reciben mensajes por webhook
-(`/api/telegram/cliente` y `/api/telegram/admin`), que se registra solo al arrancar en Railway.
+(`/api/telegram/cliente` y `/api/telegram/admin`), que se registra solo al arrancar en producción (cuando está definido `PUBLIC_DOMAIN`).
 Si alguien no autorizado escribe, el bot le muestra su chat ID y avisa al administrador.
 
 **Bot del cliente** — avisos de notificaciones nuevas y recordatorios de vencimiento (con botón de PDF), y:
@@ -49,16 +49,23 @@ Si alguien no autorizado escribe, el bot le muestra su chat ID y avisa al admini
 resumen de errores del log cada 15 minutos, y: `/estado`, `/sistema`, `/barridos`, `/errores`, `/logs [n]`,
 `/buscar texto`, `/auditoria`, `/barrer`.
 
-## Variables de entorno (Railway → Variables)
+## Despliegue
+
+Producción corre en un **VPS (Hostinger)** con Docker Compose y Caddy como proxy HTTPS, sobre un dominio
+`sslip.io`. Cada push a `main` se despliega solo con GitHub Actions. Paso a paso, respaldos y restauración:
+[`deploy/DESPLIEGUE_VPS.md`](deploy/DESPLIEGUE_VPS.md).
+
+## Variables de entorno (archivo `.env` del servidor; plantilla en `.env.example`)
 
 ### Obligatorias
 
 | Variable | Descripción |
 |---|---|
-| `BREVO_API_KEY` | Clave API de Brevo (Railway bloquea el SMTP de Gmail). En Brevo, desactivar el bloqueo de IP para claves API. |
-| `EMAIL_SENDER` | Remitente **verificado** en Brevo. |
+| `PUBLIC_DOMAIN` | Dominio público, p. ej. `anm.203-0-113-10.sslip.io`. Registra el webhook de Telegram y arma los enlaces de los correos. |
+| `EMAIL_SENDER` | Cuenta de Gmail que envía. |
+| `EMAIL_PASSWORD` | **Contraseña de aplicación** de Google para esa cuenta (no la contraseña normal). |
 | `EMAIL_RECEIVER` | Destinatario(s) de las alertas, separados por coma. |
-| `DB_PATH` | `/data/anm_notificaciones.db` con un **Volume** montado en `/data`. Sin esto la base se reinicia en cada deploy. |
+| `DB_PATH` | Lo fija `docker-compose.yml` (`/data/anm_notificaciones.db`, volumen `anm_data`). |
 | `ADMIN_USER` / `ADMIN_PASSWORD` | Usuario **administrador**: ve todo, incluido el monitoreo y los logs. |
 | `PANEL_USER` / `PANEL_PASSWORD` | Usuario del **panel** para el día a día: bandeja, vencimientos y títulos, sin monitoreo. |
 
@@ -77,7 +84,7 @@ resumen de errores del log cada 15 minutos, y: `/estado`, `/sistema`, `/barridos
 | `GEMINI_MODELOS_RESPALDO` | `gemini-3.1-flash-lite,gemini-3.6-flash` | Modelos que se prueban si el principal está saturado o sin cupo. |
 | `GEMINI_MAX_POR_BARRIDO` | `25` | Máximo de resúmenes por barrido (cuida el cupo gratuito). |
 | `ALERTAS_EMAIL` | `EMAIL_RECEIVER` | Correo para alertas de fallas del sistema. |
-| `URL_PANEL` | URL de Railway | Enlace al panel que aparece en los correos. |
+| `URL_PANEL` | `https://PUBLIC_DOMAIN` | Enlace al panel que aparece en los correos. |
 | `FECHA_MINIMA_ALERTAS` | `2025-06-01` | Las notificaciones publicadas antes de esta fecha se guardan pero no se envían por correo. |
 | `FUENTE_COACTIVO` | `true` | Consultar avisos de cobro coactivo. |
 | `DIAS_FIJACION_AVISO` | `5` | Días hábiles que el aviso permanece publicado. |
@@ -87,7 +94,9 @@ resumen de errores del log cada 15 minutos, y: `/estado`, `/sistema`, `/barridos
 | `DIAS_SIN_BARRIDO_OK` | `3` | Días sin barrido exitoso antes de alertar. |
 | `ARCHIVO_DIR` | junto a `DB_PATH` | Carpeta donde se guardan las copias de los PDF. |
 | `DATABASE_URL` | — | Alternativa: usar Postgres en lugar de SQLite. |
-| `RAILWAY_API_TOKEN` | — | Token de proyecto de Railway (Project Settings → Tokens) para ver los logs de Railway en el monitoreo. |
+| `SMTP_HOST` / `SMTP_PORT` | `smtp.gmail.com` / `465` | Servidor SMTP (465 = SSL, 587 = STARTTLS). |
+| `BREVO_API_KEY` | — | Alternativa por API HTTP (solo si no hay `EMAIL_PASSWORD`). |
+| `RAILWAY_API_TOKEN` | — | Solo si se vuelve a Railway: logs de Railway en el monitoreo. |
 | `SESSION_SECRET` | derivado de las contraseñas | Clave para firmar las sesiones. Si cambia una contraseña, se cierran todas las sesiones. |
 | `LOG_DIR` | junto a `DB_PATH` | Carpeta donde se guardan los logs de la aplicación. |
 

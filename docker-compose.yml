@@ -1,0 +1,45 @@
+# NotificacionesANM en el VPS.
+# Requiere el proxy compartido (deploy/proxy) levantado antes: crea la red "proxy" y publica 80/443.
+# Esta app NO publica puertos: solo Caddy la alcanza por la red interna.
+#
+# Despliegue: ./deploy/deploy.sh   (lo ejecuta también GitHub Actions en cada push a main)
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        APP_COMMIT_SHA: ${APP_COMMIT_SHA:-}
+        APP_COMMIT_MESSAGE: ${APP_COMMIT_MESSAGE:-}
+    image: notificaciones-anm:latest
+    container_name: notificaciones-anm
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_PATH: /data/anm_notificaciones.db
+      PORT: "8000"
+      TZ: America/Bogota
+    volumes:
+      - anm_data:/data
+    networks:
+      - proxy
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  anm_data:
+    name: anm_data
+
+networks:
+  proxy:
+    external: true

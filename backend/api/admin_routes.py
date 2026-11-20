@@ -1,11 +1,16 @@
-"""Rutas del área de administración: métricas, logs de la aplicación y logs de Railway."""
+"""Rutas del área de administración: métricas, logs de la aplicación, logs de Railway y respaldos."""
 import os
+import sqlite3
+import tarfile
+import tempfile
 import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
 import pytz
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 
 from database import database, models
@@ -149,3 +154,47 @@ def logs_railway(deployment_id: str = None, tipo: str = "deploy", limite: int = 
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"No se pudo consultar Railway: {e}")
+
+
+# ============================================================ RESPALDO
+
+@router.get("/respaldo")
+def descargar_respaldo():
+    """
+    Descarga un .tar.gz con todo lo que hay que conservar: la base SQLite (copia consistente con la
+    API de respaldo de SQLite, aunque el servidor esté escribiendo) y el archivo de PDFs.
+    Sirve para migrar de servidor y para guardar copias periódicas. Solo administrador.
+    Restaurar: extraer el contenido en la carpeta montada en /data.
+    """
+    if os.getenv("DATABASE_URL"):
+        raise HTTPException(status_code=400, detail="La base es externa (DATABASE_URL): respáldela con sus propias herramientas.")
+    db_path = database.DB_PATH
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail=f"No se encontró la base en {db_path}.")
+
+    from servicios.analizador import _directorio_archivo
+    tmp = tempfile.mkdtemp(prefix="respaldo_")
+    copia_db = os.path.join(tmp, os.path.basename(db_path))
+    origen = sqlite3.connect(db_path)
+    destino = sqlite3.connect(copia_db)
+    try:
+        origen.backup(destino)
+    finally:
+        destino.close()
+        origen.close()
+
+    marca = datetime.now(ZONA_CO).strftime("%Y%m%d_%H%M")
+    salida = os.path.join(tmp, f"respaldo_anm_{marca}.tar.gz")
+    with tarfile.open(salida, "w:gz") as tar:
+        tar.add(copia_db, arcname=os.path.basename(db_path))
+        archivo = _directorio_archivo()
+        if os.path.isdir(archivo):
+            tar.add(archivo, arcname="archivo_pdfs")
+    print(f"[RESPALDO] Generado {os.path.basename(salida)} ({os.path.getsize(salida) / 1e6:.1f} MB)")
+
+    def limpiar():
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    return FileResponse(salida, media_type="application/gzip", filename=os.path.basename(salida),
+                        background=BackgroundTask(limpiar))

@@ -1,0 +1,4 @@
+# Los scripts del VPS siempre con fin de línea Unix, aunque se editen en Windows
+*.sh text eol=lf
+Caddyfile text eol=lf
+*.caddy text eol=lf

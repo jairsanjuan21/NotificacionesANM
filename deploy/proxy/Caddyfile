@@ -1,0 +1,7 @@
+# Configuración global. ACME_EMAIL viene de deploy/proxy/.env
+{
+	email {$ACME_EMAIL}
+}
+
+# Cada proyecto tiene su archivo en sitios/ (anm.caddy, fersautos.caddy, ...)
+import sitios/*.caddy
