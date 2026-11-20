@@ -20,7 +20,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from database import models, database
 from database.migraciones import migrar
-from api import routes, auth_routes, admin_routes, telegram_routes
+from api import routes, auth_routes, admin_routes, telegram_routes, monitor_routes
 from servicios import actividad, auth
 from scraper.anm_scraper import ejecutar_scraper, cerrar_barridos_huerfanos
 from mailer.dispatcher import enviar_recordatorios, enviar_alerta_sistema
@@ -189,8 +189,9 @@ if not auth.autenticacion_activa():
 async def control_de_acceso(request: Request, call_next):
     ruta = request.url.path
     protegida = ruta.startswith("/api/") or auth.requiere_admin(ruta)
+    # /api/monitor/* lo protege su propio token (MONITOR_TOKEN), no la sesión del panel
     if request.method == "OPTIONS" or not protegida or not auth.autenticacion_activa() \
-            or ruta in auth.RUTAS_PUBLICAS:
+            or ruta in auth.RUTAS_PUBLICAS or ruta.startswith("/api/monitor/"):
         return await call_next(request)
     sesion = auth.leer_token(request.cookies.get(auth.NOMBRE_COOKIE, ""))
     if not sesion:
@@ -206,6 +207,7 @@ app.include_router(auth_routes.router, prefix="/api")
 app.include_router(admin_routes.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(telegram_routes.router, prefix="/api")
+app.include_router(monitor_routes.router, prefix="/api")
 
 @app.get("/api/scheduler/estado")
 def obtener_estado_scheduler():
