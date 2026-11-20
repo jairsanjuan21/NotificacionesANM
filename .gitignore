@@ -1,5 +1,6 @@
-# Secretos
+# Secretos (cualquier .env, incluido deploy/proxy/.env)
 .env
+!.env.example
 backend/.env
 
 # Python
@@ -15,7 +16,7 @@ frontend/dist/
 # Copias de PDF archivadas en local
 backend/archivo_pdfs/
 
-# Logs de la aplicación (se guardan en el Volume de Railway)
+# Logs de la aplicación (se guardan en el volumen /data)
 *.log
 *.log.1
 
