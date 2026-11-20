@@ -16,5 +16,8 @@
 		-Server
 	}
 
+	# Solo para el monitor del VPS por la red interna de Docker: desde internet no existe
+	respond /api/monitor/* 404
+
 	reverse_proxy notificaciones-anm:8000
 }
