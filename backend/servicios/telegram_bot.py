@@ -131,7 +131,7 @@ def _avisar_intruso(canal: str, chat_id: int, usuario: dict, texto: str):
                     f"Chat ID: <code>{chat_id}</code>\n"
                     f"Escribió: {escape(texto[:200])}\n\n"
                     f"Si es alguien de confianza, agrega su ID a "
-                    f"<code>{'TG_CLIENTE_CHATS' if canal == 'cliente' else 'TG_ADMIN_CHAT'}</code> en Railway.")
+                    f"<code>{'TG_CLIENTE_CHATS' if canal == 'cliente' else 'TG_ADMIN_CHAT'}</code> en el .env del servidor.")
 
 
 def _registrar_actividad(canal: str, usuario: dict):
@@ -247,12 +247,14 @@ _registrar_comunes("admin", "Soy el bot de administración. Te aviso sobre barri
 
 def url_base_publica() -> str:
     """
-    URL pública del servicio. Solo se registra el webhook si estamos en Railway
-    (o si se fuerza con TG_WEBHOOK_BASE): así una copia local nunca le roba el webhook a producción.
+    URL pública del servicio. Solo se registra el webhook en producción, es decir, si está definido
+    PUBLIC_DOMAIN (VPS), RAILWAY_PUBLIC_DOMAIN (Railway) o TG_WEBHOOK_BASE: así una copia local
+    nunca le roba el webhook a producción.
     """
     if os.getenv("TG_WEBHOOK_BASE"):
         return os.getenv("TG_WEBHOOK_BASE").rstrip("/")
-    dominio = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    dominio = (os.getenv("PUBLIC_DOMAIN") or os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip().rstrip("/")
+    dominio = dominio.removeprefix("https://").removeprefix("http://")
     return f"https://{dominio}" if dominio else ""
 
 
@@ -265,7 +267,7 @@ def configurar_webhooks() -> dict:
             resultado[canal] = "sin configurar"
             continue
         if not base:
-            resultado[canal] = "sin URL pública (no se registra el webhook fuera de Railway)"
+            resultado[canal] = "sin URL pública (defina PUBLIC_DOMAIN para registrar el webhook)"
             continue
 
         url = f"{base}/api/telegram/{canal}"

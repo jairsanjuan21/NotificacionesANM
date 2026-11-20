@@ -138,14 +138,22 @@ def _linea_acceso(clave: str) -> str:
     return _hace(fecha) + (f" · {escape(detalle)}" if detalle else "")
 
 
+def version_desplegada():
+    """(commit corto, primera línea del mensaje). En el VPS los inyecta el script de deploy al construir
+    la imagen (APP_COMMIT_SHA / APP_COMMIT_MESSAGE); en Railway, la propia plataforma."""
+    commit = os.getenv("APP_COMMIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or ""
+    mensaje = os.getenv("APP_COMMIT_MESSAGE") or os.getenv("RAILWAY_GIT_COMMIT_MESSAGE") or ""
+    return commit[:7], mensaje.split("\n")[0]
+
+
 def _linea_deployment() -> str:
     """
     Versión que está corriendo y, si hay token de Railway, si el deploy más reciente es otro:
     un deploy que falló deja corriendo la versión anterior, y eso conviene saberlo.
     """
-    commit = (os.getenv("RAILWAY_GIT_COMMIT_SHA") or "")[:7]
-    mensaje = escape((os.getenv("RAILWAY_GIT_COMMIT_MESSAGE") or "").split("\n")[0][:60])
-    version = f"<code>{commit}</code> «{mensaje}»" if commit else "versión local (fuera de Railway)"
+    commit, mensaje = version_desplegada()
+    mensaje = escape(mensaje[:60])
+    version = f"<code>{commit}</code> «{mensaje}»" if commit else "versión local (sin datos de commit)"
     if not os.getenv("RAILWAY_API_TOKEN"):
         return f"{version}\n    activo desde hace {_duracion(time.time() - INICIO_PROCESO)}"
     try:
@@ -188,7 +196,7 @@ def cmd_estado(ctx: Contexto):
 
     partes = [
         f"🖥️ <b>Estado en línea del sistema</b>\n{linea_salud}",
-        f"🚀 <b>Último deployment en Railway</b>\n{_linea_deployment()}",
+        f"🚀 <b>Versión desplegada</b>\n{_linea_deployment()}",
         (f"⏳ <b>Barrido #{en_curso.id_ejecucion} en curso</b> desde {_hora_co(en_curso.inicio, '%H:%M')}\n\n" if en_curso else "")
         + f"🤖 <b>Último barrido automático</b>\n{automatico}\n\n"
         f"🖐️ <b>Último barrido manual</b>\n{manual}",
@@ -377,8 +385,8 @@ def notificar_fin_barrido(id_ejecucion: int):
 
 def aviso_arranque(barridos_interrumpidos: int = 0, webhooks: dict = None):
     """Aviso de que el servidor arrancó: deja rastro de cada deploy, reinicio o caída."""
-    commit = (os.getenv("RAILWAY_GIT_COMMIT_SHA") or "")[:7]
-    mensaje = (os.getenv("RAILWAY_GIT_COMMIT_MESSAGE") or "").split("\n")[0][:80]
+    commit, mensaje = version_desplegada()
+    mensaje = mensaje[:80]
     texto = "🔄 <b>Servidor iniciado</b>"
     if commit:
         texto += f"\nVersión <code>{commit}</code> {escape(mensaje)}"

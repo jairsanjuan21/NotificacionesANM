@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from api import schemas
 from database import database, models
-from mailer.dispatcher import enviar_alertas_pendientes, enviar_correo, enviar_recordatorios
+from mailer.dispatcher import enviar_alertas_pendientes, enviar_correo, enviar_recordatorios, modo_envio
 from scraper.anm_scraper import (BarridoEnCurso, barrido_en_curso, iniciar_barrido_en_segundo_plano,
                                  procesar_historico,
                                  REGIONALES_ANM, URL_BASE, URL_COACTIVO, descubrir_formulario)
@@ -437,7 +437,8 @@ def ejecutar_recordatorios(db: Session = Depends(database.get_db)):
 def diagnostico_correo(db: Session = Depends(database.get_db)):
     pendientes = db.query(models.Notificacion).filter(models.Notificacion.notificacion_enviada == False).count()
     return {
-        "modo_envio": "brevo_api" if os.getenv("BREVO_API_KEY") else ("gmail_smtp" if os.getenv("EMAIL_PASSWORD") else "sin_configurar"),
+        "modo_envio": modo_envio(),
+        "smtp_servidor": f'{os.getenv("SMTP_HOST", "smtp.gmail.com")}:{os.getenv("SMTP_PORT", "465")}',
         "BREVO_API_KEY": bool(os.getenv("BREVO_API_KEY")),
         "EMAIL_SENDER": bool(os.getenv("EMAIL_SENDER")),
         "EMAIL_RECEIVER": bool(os.getenv("EMAIL_RECEIVER")),

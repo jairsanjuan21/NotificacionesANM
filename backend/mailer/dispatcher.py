@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr, formatdate, make_msgid
 from html import escape
 
 import requests
@@ -21,54 +22,90 @@ print("Iniciando Módulo de Mensajería (Email Dispatcher)...")
 ORDEN_URGENCIA = {"alta": 0, "revisar": 1, "media": 2, "baja": 3, None: 4}
 COLOR_URGENCIA = {"alta": "#dc2626", "revisar": "#7c3aed", "media": "#d97706", "baja": "#16a34a"}
 ETIQUETA_URGENCIA = {"alta": "ALTA", "revisar": "REVISAR", "media": "MEDIA", "baja": "BAJA"}
-URL_PANEL = os.getenv("URL_PANEL", "https://notificacionesanm-production.up.railway.app")
+_DOMINIO = (os.getenv("PUBLIC_DOMAIN") or os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip().rstrip("/")
+URL_PANEL = os.getenv("URL_PANEL") or (f"https://{_DOMINIO.removeprefix('https://')}" if _DOMINIO else "http://localhost:8000")
 
 
 # ======================================================================= Envío base
 
-def _enviar_via_brevo_o_smtp(remitente: str, destinatario: str, password: str, asunto: str, cuerpo_html: str):
-    """
-    Envía el correo usando la API HTTP de Brevo (Puerto 443) si BREVO_API_KEY está configurada.
-    Si no existe BREVO_API_KEY, utiliza SMTP tradicional (Puerto 465) como respaldo local.
-    """
-    brevo_api_key = os.getenv("BREVO_API_KEY")
-    lista_correos = [c.strip() for c in destinatario.split(",") if c.strip()]
+NOMBRE_REMITENTE = os.getenv("EMAIL_SENDER_NAME", "Sistema de Monitoreo Minero ANM")
 
-    if brevo_api_key:
-        response = requests.post(
-            "https://api.brevo.com/v3/smtp/email",
-            json={
-                "sender": {"name": "Sistema de Monitoreo Minero ANM", "email": remitente},
-                "to": [{"email": c} for c in lista_correos],
-                "subject": asunto,
-                "htmlContent": cuerpo_html,
-            },
-            headers={"accept": "application/json", "api-key": brevo_api_key, "content-type": "application/json"},
-            timeout=20,
-        )
-        if response.status_code not in (200, 201, 202):
-            raise Exception(f"Error API Brevo ({response.status_code}): {response.text}")
-        try:
-            id_mensaje = response.json().get("messageId", "")
-        except Exception:
-            id_mensaje = ""
-        # El messageId permite buscar este correo en Brevo (Transaccional → Registros) y ver si se entregó
-        print(f"[DISPATCHER HTTP] Correo aceptado por Brevo para: {', '.join(lista_correos)} | messageId={id_mensaje}")
-        return True
 
-    if not password:
-        raise Exception("No se encontró BREVO_API_KEY ni EMAIL_PASSWORD en las variables de entorno.")
+def _enviar_por_smtp(remitente: str, lista_correos: list, password: str, asunto: str, cuerpo_html: str):
+    """
+    SMTP autenticado (por defecto Gmail). Con Gmail, EMAIL_PASSWORD es una CONTRASEÑA DE APLICACIÓN
+    (requiere verificación en 2 pasos), no la contraseña normal de la cuenta. Como el correo sale de los
+    propios servidores de Google con la cuenta del remitente, pasa SPF/DKIM/DMARC sin dominio propio.
+    Puerto 465 = SSL directo; 587 = STARTTLS.
+    """
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    puerto = int(os.getenv("SMTP_PORT", "465"))
+    # Google muestra la contraseña de aplicación en bloques ("abcd efgh ijkl mnop"): se quitan los espacios
+    clave = password.replace(" ", "")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = asunto
-    msg["From"] = remitente
+    msg["From"] = formataddr((NOMBRE_REMITENTE, remitente))
     msg["To"] = ", ".join(lista_correos)
-    msg.attach(MIMEText(cuerpo_html, "html"))
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as server:
-        server.login(remitente, password)
-        server.sendmail(remitente, lista_correos, msg.as_string())
-    print(f"[DISPATCHER SMTP] Correo enviado vía SMTP a: {', '.join(lista_correos)}")
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=remitente.split("@")[-1])
+    msg.attach(MIMEText(cuerpo_html, "html", "utf-8"))
+
+    if puerto == 465:
+        servidor = smtplib.SMTP_SSL(host, puerto, timeout=30)
+    else:
+        servidor = smtplib.SMTP(host, puerto, timeout=30)
+        servidor.starttls()
+    with servidor:
+        servidor.login(remitente, clave)
+        servidor.sendmail(remitente, lista_correos, msg.as_string())
+    print(f"[DISPATCHER SMTP] Correo enviado por {host}:{puerto} a: {', '.join(lista_correos)}")
     return True
+
+
+def _enviar_por_brevo(remitente: str, lista_correos: list, api_key: str, asunto: str, cuerpo_html: str):
+    """API HTTP de Brevo (puerto 443). Útil solo donde el SMTP está bloqueado (p. ej. Railway Hobby)."""
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        json={
+            "sender": {"name": NOMBRE_REMITENTE, "email": remitente},
+            "to": [{"email": c} for c in lista_correos],
+            "subject": asunto,
+            "htmlContent": cuerpo_html,
+        },
+        headers={"accept": "application/json", "api-key": api_key, "content-type": "application/json"},
+        timeout=20,
+    )
+    if response.status_code not in (200, 201, 202):
+        raise Exception(f"Error API Brevo ({response.status_code}): {response.text}")
+    try:
+        id_mensaje = response.json().get("messageId", "")
+    except Exception:
+        id_mensaje = ""
+    print(f"[DISPATCHER HTTP] Correo aceptado por Brevo para: {', '.join(lista_correos)} | messageId={id_mensaje}")
+    return True
+
+
+def modo_envio() -> str:
+    """'gmail_smtp' si hay EMAIL_PASSWORD (preferido), 'brevo_api' si solo hay BREVO_API_KEY."""
+    if os.getenv("EMAIL_PASSWORD"):
+        return "gmail_smtp"
+    if os.getenv("BREVO_API_KEY"):
+        return "brevo_api"
+    return "sin_configurar"
+
+
+def _enviar_via_brevo_o_smtp(remitente: str, destinatario: str, password: str, asunto: str, cuerpo_html: str):
+    """
+    Envía por SMTP si hay EMAIL_PASSWORD (modo principal en el VPS) y, si no, por la API de Brevo.
+    """
+    lista_correos = [c.strip() for c in destinatario.split(",") if c.strip()]
+    if password:
+        return _enviar_por_smtp(remitente, lista_correos, password, asunto, cuerpo_html)
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+    if brevo_api_key:
+        return _enviar_por_brevo(remitente, lista_correos, brevo_api_key, asunto, cuerpo_html)
+    raise Exception("No hay EMAIL_PASSWORD (contraseña de aplicación de Gmail) ni BREVO_API_KEY configurados.")
 
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo_html: str):
@@ -299,7 +336,7 @@ def enviar_alerta_sistema(asunto: str, detalle: str, telegram: bool = True):
     """
     contenido = (f"<p style='color:#dc2626;font-weight:bold'>{escape(asunto)}</p>"
                  f"<pre style='white-space:pre-wrap;background:#f3f4f6;padding:12px;border-radius:6px;font-size:13px'>{escape(detalle)}</pre>"
-                 "<p>Revise la pestaña <strong>Monitoreo</strong> del panel y los logs de Railway.</p>")
+                 "<p>Revise la pestaña <strong>Monitoreo</strong> del panel y los logs del servidor.</p>")
     destino = os.getenv("ALERTAS_EMAIL") or os.getenv("EMAIL_RECEIVER")
     try:
         enviar_correo(destino, f"⚠️ Sistema ANM: {asunto}",
