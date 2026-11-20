@@ -1,7 +1,7 @@
 /**
  * Panel con borde para agrupar contenido relacionado.
  *
- *   <Tarjeta titulo="Variables del servidor" subtitulo="Se configuran en Railway" acciones={<Boton …/>}>
+ *   <Tarjeta titulo="Variables del servidor" subtitulo="Se configuran en el .env del servidor" acciones={<Boton …/>}>
  *     …
  *   </Tarjeta>
  *
