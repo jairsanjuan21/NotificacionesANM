@@ -111,17 +111,3 @@
 
 .estado-general p { margin-top: var(--espacio-1); }
 
-/* Railway */
-.rejilla-railway { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: var(--espacio-5); align-items: start; }
-@media (max-width: 1100px) { .rejilla-railway { grid-template-columns: 1fr; } }
-.tarjeta-angosta { max-width: 720px; }
-.pasos { margin: 0; padding-left: var(--espacio-5); display: grid; gap: var(--espacio-2); color: var(--tinta-2); }
-.relleno-lateral { padding: 0 var(--espacio-4); }
-.relleno-lateral:empty { display: none; }
-.opcion-deploy {
-  display: flex; flex-direction: column; gap: 2px; width: 100%;
-  padding: 9px var(--espacio-4); border: 0; border-left: 3px solid transparent;
-  background: none; text-align: left; cursor: pointer;
-}
-.opcion-deploy:hover { background: var(--superficie-2); }
-.opcion-deploy[aria-selected="true"] { background: var(--verdin-suave); border-left-color: var(--verdin); }

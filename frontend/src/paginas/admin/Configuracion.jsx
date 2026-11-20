@@ -17,9 +17,8 @@ function Fila({ estado, titulo, children }) {
 
 export default function Configuracion() {
   const { datos, error: fallo } = useConsulta('configuracion', () =>
-    Promise.all([api.get('/correo/diagnostico'), api.get('/admin/railway/estado')])
-      .then(([a, b]) => ({ diag: a.data, railway: b.data })));
-  const { diag, railway } = datos || {};
+    api.get('/correo/diagnostico').then(r => ({ diag: r.data })));
+  const { diag } = datos || {};
   const error = fallo && mensajeError(fallo);
 
   if (error) return <EstadoVacio tono="error" titulo="No se pudo leer la configuración">{error}</EstadoVacio>;
@@ -53,18 +52,13 @@ export default function Configuracion() {
         <Fila estado={diag.telegram_canales?.admin ? 'ok' : 'no'} titulo="Telegram: bot del administrador">
           {diag.telegram_canales?.admin ? 'Configurado.' : <>Opcional: <code>TG_ADMIN_TOKEN</code> y <code>TG_ADMIN_CHAT</code>.</>}
         </Fila>
-        <Fila estado={railway?.token_configurado ? 'ok' : 'no'} titulo="Logs de Railway">
-          {railway?.token_configurado ? 'Token configurado.' : <>Opcional: <code>RAILWAY_API_TOKEN</code> (token de proyecto).</>}
-        </Fila>
       </section>
 
       <section className="tarjeta">
         <h2>Entorno</h2>
         <p className="subtitulo">Dónde está corriendo el sistema.</p>
         <ul className="lista-simple">
-          <li><span>Plataforma</span><strong>{railway?.en_railway ? 'Railway' : 'Servidor propio (VPS)'}</strong></li>
-          <li><span>Entorno</span><strong>{railway?.entorno || '—'}</strong></li>
-          <li><span>Servicio</span><strong>{railway?.servicio || '—'}</strong></li>
+          <li><span>Plataforma</span><strong>Servidor propio (VPS, Docker + Caddy)</strong></li>
           <li><span>Notificaciones pendientes de envío</span><strong className="num">{diag.notificaciones_pendientes}</strong></li>
         </ul>
       </section>
